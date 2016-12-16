@@ -1,0 +1,55 @@
+{
+    "App Restart": {
+        "Delay": 3,
+        "Show Message": true
+    },
+    "Displax": {
+        "Screen Width": 1920,
+        "Screen Height": 1080
+    },
+    "Scenes": {
+        "First Scene": 0, // 0=Intro, 1=Playground
+        "Number Of Artists": 8,
+    	"Scene1 Intro Loop Frame": 1249,
+        "Idle Time To Artists": 300,
+        "Idle Time To Playground": 10
+    },
+    "Ableton": {
+        "Ableton Host": "localhost",
+        "Ableton Sender Port": 9030,
+        "Ableton Receiver Port": 9031,
+        "First Clip Index": 2,
+        "Artist Offset": 5
+    },
+    "TUIO Client": {
+        "Client Port": 3330
+    },
+    "TUIO Server": {
+        "Client Port": 9050
+    },
+    "Color": {
+        "Minimum X Offset": 15,
+        "Circle Alpha Min": 0,
+        "Circle Alpha Max": 200
+    },
+    "Debug Mode": {
+        "Show GUI": true,
+        "Show FPS": true,
+        "Show TUIO Cursors": true,
+        "Scene1 Background Mode": 1, // 0=None, 1=Background video
+        "Scene2 Background Mode": 2, // 0=None, 1=Background video, 2=Background images
+        "Enable VBO": true,
+        "Enable Vertical Sync": false,
+        "Enable Demo Objects": false
+    },
+    "Release Mode": {
+        "Show GUI": false,
+        "Show FPS": false,
+        "Show TUIO Cursors": false,
+        "Scene1 Background Mode": 1, // 0=None, 1=Background video
+        "Scene2 Background Mode": 2, // 0=None, 1=Background video, 2=Background images
+        "Enable VBO": true,
+        "Enable Vertical Sync": false,
+        "Enable Demo Objects": false
+    }
+}

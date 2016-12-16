@@ -1,0 +1,12 @@
+ofxCubeMap
+ofxFlowTools
+ofxGui
+ofxJSON
+ofxKinectV2
+ofxMSACore
+ofxMSAFluid
+ofxMultiKinectV2
+ofxOpenCv
+ofxOsc
+ofxShadersFX
+ofxTurboJpeg
