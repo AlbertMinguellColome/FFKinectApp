@@ -24,8 +24,8 @@ void ofApp::setup() {
     gui.setup();
     gui.setPosition(0, 40);
     gui.add(ZFilterMesh.setup("ZFilterMesh",1.5,0,10));
-    gui.add(front.setup("frontSlider",10,0,150));
-    gui.add(back.setup("backSlider",100,0,1000));
+    gui.add(front.setup("frontSlider",0,0,1500));
+    gui.add(back.setup("backSlider",0,0,8000));
     gui.add(pointSize.setup("pointSize",2,0,100));  // Increase-decrease point size use it with meshMode = 1 (GL_POINTS)
     gui.add(meshMode.setup("meshMode",1,1,4));  // It change mesh mode POINTS, LINES ,TRIANGLES = activates delanuay, LINES_LOOP
     gui.add(meshType.setup("meshType",1,1,3));// Changes between standard pointCloud , CubeMap and Texture mode
@@ -104,7 +104,7 @@ void ofApp::setup() {
     depthFloat.allocate(kinect0.getDepthPixelsRef().getWidth(), kinect0.getDepthPixelsRef().getHeight());
     
   
-    useMultikinect = true;
+    useMultikinect = false;
     
     if(useMultikinect){
         // kinect setup
@@ -118,7 +118,7 @@ void ofApp::setup() {
         kinect0.start();
         kinect0.update();
     }else{
-          setupKinect2();
+          setupKinect();
     }
 }
 //--------------------------------------------------------------
@@ -129,7 +129,8 @@ void ofApp::update() {
     if(cameraSpin){spinCamera();};
     if(!cameraSpin){updateCamera();};
     
-    updateKinectMesh();
+    //updateKinectMesh();
+    updateKinectV1Mesh();
     
     // Particle update -> TODO move to method
     for(unsigned int i = 0; i < p.size(); i++){
@@ -154,10 +155,10 @@ void ofApp::calcNormals(ofMesh &mesh) {
     const int ic = mesh.getIndices()[i + 2];
     //  cout<<"Index:"<<i<<"\n";
     // cout<<ia <<ib<<ic<<"\n";
-    if (ia >= mesh.getVertices().size() || ib >= mesh.getVertices().size() ||
-        ic >= mesh.getVertices().size()) {
-      return;
-    }
+//    if (ia >= mesh.getVertices().size() || ib >= mesh.getVertices().size() ||
+//        ic >= mesh.getVertices().size()) {
+//      return;
+//    }
     //     cout<<mesh.getVertices()[ia] - mesh.getVertices()[ib]
     //     <<mesh.getVertices()[ic] - mesh.getVertices()[ib]<<"\n";
     ofVec3f e1 = mesh.getVertices()[ia] - mesh.getVertices()[ib];
@@ -420,154 +421,261 @@ void ofApp::updateCamera(){
     cam.setDistance(cameraDistance);
 }
 
+void ofApp::updateKinectV1Mesh() {
+    kinect.update();
+    
+    int w = 640;
+    int h = 480;
+    //ofMesh mesh;
+//    mesh.setMode(OF_PRIMITIVE_TRIANGLES);
+    mesh.clear();
+    points.clear();
+    indexs.clear();
+    int step = 2;
+    
+    // Populate vertex
+    if (kinect.isFrameNew()) {
+    for(int y = 0; y < h; y += step) {
+        vector<ofVec3f> temppoints;
+        vector<ofColor> tempcolors;
+        
+        points.push_back(temppoints);
+        colors.push_back(tempcolors);
+        for(int x = 0; x < w; x += step) {
+            float distance = kinect.getDistanceAt(x, y);
+            if(distance > front && distance < back) {
+                mesh.addColor(ofColor::white);
+                ofVec3f tempPoint;
+                tempPoint = kinect.getWorldCoordinateAt(x, y);
+                points[y / step].push_back(tempPoint);
+            }else{
+                ofVec3f tempPoint2;
+                ofColor tempColor2;
+                tempPoint2 = ofVec3f(x, y, 0);
+                points[y / step].push_back(tempPoint2);
+            }
+        }
+    }
+    
+    // Create Vertex Indexes
+    int ind = 0;
+    for (int m = 0; m < h; m += step) {
+        vector<int> tempindexs;
+        indexs.push_back(tempindexs);
+        
+        for (int n = 0; n < w; n += step) {
+            if (points[m / step][n / step].z != 0) {
+                ofVec3f ptTemp= points[m / step][n / step];
+                mesh.addVertex(ptTemp);
+                indexs[m / step].push_back(ind);
+                ind++;
+            } else {
+                indexs[m / step].push_back(-1);
+            }
+        }
+    }
+    
+    // Delanuay triangulation
+    int W = int(w / step);
+    for (int b = 0; b < h - step; b += step) {
+        for (int a = 0; a < w - 1; a += step) {
+            if ((indexs[int(b / step)][int(a / step)] != -1 &&
+                 indexs[int(b / step)][int(a / step + 1)] != -1) &&
+                (indexs[int(b / step + 1)][int(a / step + 1)] != -1 &&
+                 indexs[int(b / step + 1)][int(a / step)] != -1)) {
+                    
+                    mesh.addTriangle(indexs[int(b / step)][int(a / step)],
+                                     indexs[int(b / step)][int(a / step + 1)],
+                                     indexs[int(b / step + 1)][int(a / step + 1)]);
+                    mesh.addTriangle(indexs[int(b / step)][int(a / step)],
+                                     indexs[int(b / step + 1)][int(a / step + 1)],
+                                     indexs[int(b / step + 1)][int(a / step)]);
+                }
+        }
+    }
+    
+    // Calculate normals
+    calcNormals(mesh);
+        
+    }
+}
+
 void ofApp::updateKinectMesh(){
     kinect0.update();
     
+    
     if (!useMultikinect){
-        for(int d = 0; d < kinects.size(); d++){
-            kinects[d]->update();
-            if( kinects[d]->isFrameNew() ){
+    
+        int w = 640;
+        int h = 480;
+        int total = 0;
+        int step = 2;
+        for(int y = 0; y < h; y += step) {
+            for(int x = 0; x < w; x += step) {
+                if(kinect.getDistanceAt(x, y) > 0) {
+                    mesh.addColor(kinect.getColorAt(x,y));
+                    mesh.addVertex(kinect.getWorldCoordinateAt(x, y));
                     
-                    int step = meshResolution;
-                    int total = 0;
-                    int h = 512;
-                    int w = 424;
-                
-                        
-                      //  depthFloat.setFromPixels(kinect0.getDepthPixelsRef(),w,h);
-                       // grayImage.setFromFloatImage(depthFloat);
-                        
-                        if (delayMode) {
-                            if (kinectFrameLimiter > 20) {
-                                kinectFrameLimiter = 0;
-                                mesh.clear();
-                            }
-                        }
-                        if (kinectFrameLimiter >= 0) {
-                            if(!delayMode)
-                                mesh.clear();
-                            
-                            points.clear();
-                            colors.clear();
-                            indexs.clear();
-                            
-                            {
-                                vector<demoParticle> tempParticles;
-                                for (int j = 0; j < h; j += step) {
-                                    vector<ofVec3f> temppoints;
-                                    vector<ofColor> tempcolors;
-                                    
-                                    points.push_back(temppoints);
-                                    colors.push_back(tempcolors);
-                                    
-                                    for (int i = 0; i < w; i += step) {
-                                        float distance = kinect0.getDistanceAt(i, j);
-                                        float previous_distance;
-                                        float next_distance;
-                                        float up_distance;
-                                        float down_distance;
-                                        float z_difference;
-                                        
-                                        //if (distance > front && distance < back) {
-                                            ofVec3f tempPoint;
-                                            ofColor tempColor;
-                                            demoParticle particle;
-                                            tempPoint = kinects[d]->getWorldCoordinateAt(i,j);
-                                            ofColor c;
-                                            float h = ofMap(distance, 50, 200, 0, 255, true);
-                                            c.setHsb(h, 255, 255);
-                                            points[j / step].push_back(tempPoint);
-                                            colors[j / step].push_back(ofColor::white);
-                                            particle.setPosition(tempPoint);
-                                            particle.setMode(PARTICLE_MODE_NOISE);
-                                            particle.reset();
-                                            particle.addColor(c);
-                                            tempParticles.push_back(particle);
-                                            total++;
-                                            
-                                       /* } else {
-                                            ofVec3f tempPoint2;
-                                            ofColor tempColor2;
-                                            tempPoint2 = ofVec3f(i, j, 0);
-                                            tempColor2 = ofColor(ofColor::yellow);
-                                            points[j / step].push_back(tempPoint2);
-                                            colors[j / step].push_back(tempColor2);
-                                        }*/
-                                    }
-                                }
-                                
-                                if(particleFrameLimiter>2 && activateParticles){
-                                    particleFrameLimiter=0;
-                                    p.reserve( p.size() + tempParticles.size() );                // preallocate memory without erase
-                                    p.insert( p.end(), tempParticles.begin(), tempParticles.end() );
-                                    tempParticles.clear();
-                                    
-                                }else if(!activateParticles){
-                                    p.clear();
-                                }
-                                
-                                int ind = 0;
-                                for (int m = 0; m < h; m += step) {
-                                    vector<int> tempindexs;
-                                    indexs.push_back(tempindexs);
-                                    
-                                    for (int n = 0; n < w; n += step) {
-                                        if (points[m / step][n / step].z != 0) {
-                                            //   cout << points[m][n] << endl;
-                                            mesh.addColor(colors[m / step][n / step]);
-                                            ofVec3f ptTemp= points[m / step][n / step];
-                                            //   ofVec3f pt = kinect0.getWorldCoordinateAt(ptTemp.x, ptTemp.y, ptTemp.z);
-                                            mesh.addVertex(ptTemp);
-                                            indexs[m / step].push_back(ind);
-                                            ind++;
-                                        } else {
-                                            indexs[m / step].push_back(-1);
-                                        }
-                                    }
-                                }
-                                // Drops 4 fps
-                                if (!pointCloudMode) {
-                                    int W = int(w / step);
-                                    for (int b = 0; b < h - step; b += step) {
-                                        for (int a = 0; a < w - 1; a += step) {
-                                            if ((indexs[int(b / step)][int(a / step)] != -1 &&
-                                                 indexs[int(b / step)][int(a / step + 1)] != -1) &&
-                                                (indexs[int(b / step + 1)][int(a / step + 1)] != -1 &&
-                                                 indexs[int(b / step + 1)][int(a / step)] != -1)) {
-                                                    
-                                                    mesh.addTriangle(indexs[int(b / step)][int(a / step)],
-                                                                     indexs[int(b / step)][int(a / step + 1)],
-                                                                     indexs[int(b / step + 1)][int(a / step + 1)]);
-                                                    mesh.addTriangle(indexs[int(b / step)][int(a / step)],
-                                                                     indexs[int(b / step + 1)][int(a / step + 1)],
-                                                                     indexs[int(b / step + 1)][int(a / step)]);
-                                                }
-                                        }
-                                    }
-                                }
-                                calcNormals(mesh);
-                                //                for (int i = 0; i < mesh.getIndices().size(); i++) {
-                                //                    const int ia = mesh.getIndices()[i];
-                                //                    if (ia < mesh.getVertices().size() ) {
-                                //                        
-                                //                        //ofVec3f e1 = mesh.getVertices()[ia];
-                                //                        ofVec3f norml = mesh.getNormals()[ia];
-                                //                        float hello = sqrt(4);
-                                //                        
-                                //                        float l = sqrt(norml[0]*norml[0]+norml[1]*norml[1]+norml[2]*norml[2]);
-                                //                        
-                                //                        if (l != 0.0){
-                                //                            mesh.getVertices()[ia] = mesh.getVertices()[ia] + (norml*0.9*10.0)/l;
-                                //                        }
-                                //                        
-                                //                    }
-                                //                }
-                            }
-                        }
-                        kinectFrameLimiter++;
-                        particleFrameLimiter++;
+                }else{
+                    
+                }
             }
         }
+        
+        if (delayMode) {
+            if (kinectFrameLimiter > 20) {
+                kinectFrameLimiter = 0;
+                mesh.clear();
+            }
+        }
+        if (kinectFrameLimiter >= 0) {
+            if(!delayMode)
+                mesh.clear();
+            
+            points.clear();
+            colors.clear();
+            indexs.clear();
+            
+            {
+                vector<demoParticle> tempParticles;
+                for (int j = 0; j < h; j += step) {
+                    vector<ofVec3f> temppoints;
+                    vector<ofColor> tempcolors;
+                    
+                    points.push_back(temppoints);
+                    colors.push_back(tempcolors);
+                    
+                    for (int i = 0; i < w; i += step) {
+                        float distance =kinect.getDistanceAt(i, j);
+                        float previous_distance;
+                        float next_distance;
+                        float up_distance;
+                        float down_distance;
+                        float z_difference;
+                        if(i>0){
+                            previous_distance = kinect.getDistanceAt(i-1, j);
+                            next_distance = kinect.getDistanceAt(i+1, j);
+                            if(j>0){
+                                up_distance = kinect.getDistanceAt(i, j);
+                                down_distance = kinect.getDistanceAt(i-1, j);
+                                z_difference= (std::abs(distance-previous_distance) + std::abs(distance-next_distance) + std::abs(distance-up_distance)+std::abs(distance-down_distance))/4;
+                            }else{
+                                z_difference= (std::abs(distance-previous_distance) + std::abs(distance-next_distance))/2;
+                            }
+                        }
+                        if (distance > front && distance < back) {
+                            
+                            if(z_difference >= ZFilterMesh){
+                                ofVec3f tempPoint2;
+                                ofColor tempColor2;
+                                tempPoint2 = ofVec3f(i, j, 0);
+                                tempColor2 = ofColor(ofColor::yellow);
+                                points[j / step].push_back(tempPoint2);
+                                colors[j / step].push_back(tempColor2);
+                                
+                            }else{
+                                ofVec3f tempPoint;
+                                ofColor tempColor;
+                                demoParticle particle;
+                                
+                                tempPoint = ofVec3f(i, j, distance * -1 *displacement);
+                                ofColor c;
+                                float h = ofMap(distance, 50, 200, 0, 255, true);
+                                c.setHsb(h, 255, 255);
+                                points[j / step].push_back(tempPoint);
+                                colors[j / step].push_back(ofColor::white);
+                                particle.setPosition(tempPoint);
+                                particle.setMode(PARTICLE_MODE_NOISE);
+                                particle.reset();
+                                particle.addColor(c);
+                                tempParticles.push_back(particle);
+                                total++;
+                            }
+                        } else {
+                            ofVec3f tempPoint2;
+                            ofColor tempColor2;
+                            tempPoint2 = ofVec3f(i, j, 0);
+                            tempColor2 = ofColor(ofColor::yellow);
+                            points[j / step].push_back(tempPoint2);
+                            colors[j / step].push_back(tempColor2);
+                        }
+                    }
+                }
+                
+                if(particleFrameLimiter>2 && activateParticles){
+                    particleFrameLimiter=0;
+                    p.reserve( p.size() + tempParticles.size() );                // preallocate memory without erase
+                    p.insert( p.end(), tempParticles.begin(), tempParticles.end() );
+                    tempParticles.clear();
+                    
+                }else if(!activateParticles){
+                    p.clear();
+                }
+                
+                int ind = 0;
+                for (int m = 0; m < h; m += step) {
+                    vector<int> tempindexs;
+                    indexs.push_back(tempindexs);
+                    
+                    for (int n = 0; n < w; n += step) {
+                        if (points[m / step][n / step].z != 0) {
+                            //   cout << points[m][n] << endl;
+                            mesh.addColor(colors[m / step][n / step]);
+                            ofVec3f ptTemp= points[m / step][n / step];
+                            //   ofVec3f pt = kinect0.getWorldCoordinateAt(ptTemp.x, ptTemp.y, ptTemp.z);
+                            mesh.addVertex(ptTemp);
+                            indexs[m / step].push_back(ind);
+                            ind++;
+                        } else {
+                            indexs[m / step].push_back(-1);
+                        }
+                    }
+                }
+                // Drops 4 fps
+                if (!pointCloudMode) {
+                    int W = int(w / step);
+                    for (int b = 0; b < h - step; b += step) {
+                        for (int a = 0; a < w - 1; a += step) {
+                            if ((indexs[int(b / step)][int(a / step)] != -1 &&
+                                 indexs[int(b / step)][int(a / step + 1)] != -1) &&
+                                (indexs[int(b / step + 1)][int(a / step + 1)] != -1 &&
+                                 indexs[int(b / step + 1)][int(a / step)] != -1)) {
+                                    
+                                    mesh.addTriangle(indexs[int(b / step)][int(a / step)],
+                                                     indexs[int(b / step)][int(a / step + 1)],
+                                                     indexs[int(b / step + 1)][int(a / step + 1)]);
+                                    mesh.addTriangle(indexs[int(b / step)][int(a / step)],
+                                                     indexs[int(b / step + 1)][int(a / step + 1)],
+                                                     indexs[int(b / step + 1)][int(a / step)]);
+                                }
+                        }
+                    }
+                }
+                calcNormals(mesh);
+                //                for (int i = 0; i < mesh.getIndices().size(); i++) {
+                //                    const int ia = mesh.getIndices()[i];
+                //                    if (ia < mesh.getVertices().size() ) {
+                //
+                //                        //ofVec3f e1 = mesh.getVertices()[ia];
+                //                        ofVec3f norml = mesh.getNormals()[ia];
+                //                        float hello = sqrt(4);
+                //
+                //                        float l = sqrt(norml[0]*norml[0]+norml[1]*norml[1]+norml[2]*norml[2]);
+                //
+                //                        if (l != 0.0){
+                //                            mesh.getVertices()[ia] = mesh.getVertices()[ia] + (norml*0.9*10.0)/l;
+                //                        }
+                //
+                //                    }
+                //                }
+            }
+        }
+        kinectFrameLimiter++;
+        particleFrameLimiter++;
+
+        
+        
+        
     }else{
         
         int step = meshResolution;
@@ -736,8 +844,7 @@ void ofApp::updateKinectMesh(){
 
 //--------------------------------------------------------------
 void ofApp::draw() {
-  //  ofBackgroundGradient(ofColor(64), ofColor(0));
-    //ofEnableBlendMode(OF_BLENDMODE_ADD);
+  
     ofEnableDepthTest();
     glPointSize(pointSize);
     glLineWidth(int(1));
@@ -747,8 +854,9 @@ void ofApp::draw() {
     if(showSolvers){drawSolvers();};
     ofDisableDepthTest();
     drawGui();
-    //depthFloat.draw(0, 0);
-   // grayImage.draw(0,0);
+ //   updateKinectV1Mesh();
+  
+  
 
 }
 
@@ -761,8 +869,10 @@ void ofApp::drawPointCloudMode(){
         cam.begin();
         ofDrawAxis(200);
         ofPushMatrix();
-        ofRotateZ(-180);
-        ofTranslate(-kinect0.getDepthPixelsRef().getWidth()/2, -kinect0.getDepthPixelsRef().getHeight()/2, +600);
+        //ofRotateZ(-180);
+        //ofTranslate(-kinect0.getDepthPixelsRef().getWidth()/2, -kinect0.getDepthPixelsRef().getHeight()/2, +600);
+        ofScale(1, -1, -1);
+        ofTranslate(0, 0, -1000);
         mesh.draw();
         ofPopMatrix();
         
@@ -793,8 +903,10 @@ void ofApp::drawCubeMapMode(){
     cubeMapShader.setUniform1f("reflectivity", 1.0);
     cubeMapShader.setUniform1f("displacementAmount",displacementAmount);
     ofPushMatrix();
-    ofRotateZ(-180);
-    ofTranslate(-kinect0.getDepthPixelsRef().getWidth()/2, -kinect0.getDepthPixelsRef().getHeight()/2, +600);
+    //ofRotateZ(-180);
+    //ofTranslate(-kinect0.getDepthPixelsRef().getWidth()/2, -kinect0.getDepthPixelsRef().getHeight()/2, +600);
+    ofScale(1, -1, -1);
+    ofTranslate(0, 0, -1000);
     mesh.drawFaces();
     ofPopMatrix();
     cubeMapShader.end();
@@ -810,8 +922,10 @@ void ofApp::drawTexturedMode(){
     cam.begin();
     phong.begin();
     ofPushMatrix();
-    ofRotateZ(-180);
-    ofTranslate(-kinect0.getDepthPixelsRef().getWidth()/2, -kinect0.getDepthPixelsRef().getHeight()/2, +600);
+   // ofRotateZ(-180);
+    //ofTranslate(-kinect0.getDepthPixelsRef().getWidth()/2, -kinect0.getDepthPixelsRef().getHeight()/2, +600);
+    ofScale(1, -1, -1);
+    ofTranslate(0, 0, -1000);
     mesh.drawFaces();
     ofDrawAxis(100);
     ofPopMatrix();
@@ -1064,20 +1178,38 @@ void ofApp::drawSolvers(){
 
 #pragma mark - Kinect 
 
-void ofApp:: setupKinect2(){
-
-    //see how many devices we have.
-    ofxKinectV2 tmp;
-    vector <ofxKinectV2::KinectDeviceInfo> deviceList = tmp.getDeviceList();
+void ofApp:: setupKinect(){
+    // enable depth->video image calibration
+    kinect.setRegistration(true);
     
-    //allocate for this many devices
-    kinects.resize(deviceList.size());
+    kinect.init();
+    //kinect.init(true); // shows infrared instead of RGB video image
+    //kinect.init(false, false); // disable video image (faster fps)
     
-    //Note you don't have to use ofxKinectV2 as a shared pointer, but if you want to have it in a vector ( ie: for multuple ) it needs to be.
-    for(int d = 0; d < kinects.size(); d++){
-        kinects[d] = shared_ptr <ofxKinectV2> (new ofxKinectV2());
-        kinects[d]->open(deviceList[d].serial);
+    kinect.open();		// opens first available kinect
+    //kinect.open(1);	// open a kinect by id, starting with 0 (sorted by serial # lexicographically))
+    //kinect.open("A00362A08602047A");	// open a kinect using it's unique serial #
+    
+    // print the intrinsic IR sensor values
+    if(kinect.isConnected()) {
+        ofLogNotice() << "sensor-emitter dist: " << kinect.getSensorEmitterDistance() << "cm";
+        ofLogNotice() << "sensor-camera dist:  " << kinect.getSensorCameraDistance() << "cm";
+        ofLogNotice() << "zero plane pixel size: " << kinect.getZeroPlanePixelSize() << "mm";
+        ofLogNotice() << "zero plane dist: " << kinect.getZeroPlaneDistance() << "mm";
     }
+    
+    nearThreshold = 230;
+    farThreshold = 70;
+    bThreshWithOpenCV = true;
+    
+    ofSetFrameRate(60);
+    
+    // zero the tilt on startup
+    angle = 0;
+    kinect.setCameraTiltAngle(angle);
+    // start from the front
+    bDrawPointCloud = false;
+
 }
 
 #pragma mark - camera tweens

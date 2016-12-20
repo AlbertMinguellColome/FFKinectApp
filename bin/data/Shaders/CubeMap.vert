@@ -56,7 +56,7 @@ void main()
     
     vec4 displacedPosition;
     displacedPosition = displaceVertexFunc(gl_Vertex, 2.0, 50 );
-    gl_Position = gl_ModelViewProjectionMatrix * displacedPosition;//gl_Vertex;
+  //  gl_Position = gl_ModelViewProjectionMatrix * displacedPosition;//gl_Vertex;
     
     vec4 newVertexPos;
     newVertexPos = vec4(gl_Normal * displacementAmount, 0.0) + gl_Vertex;
@@ -64,5 +64,5 @@ void main()
     
     
 
-    //gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;
+    gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;
 }

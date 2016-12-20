@@ -12,6 +12,7 @@
 #include "SettingsManager.h"
 #include "ofxOpenCv.h"
 #include "ofxKinectV2.h"
+#include "ofxKinect.h"
 
 enum meshType
 {
@@ -72,6 +73,7 @@ public:
     ofImage tex;
     ofxMultiKinectV2 kinect0;
     vector < shared_ptr<ofxKinectV2> > kinects;
+    ofxKinect kinect;
     ofVboMesh mesh;
     enum meshType meshtype;
     
@@ -162,8 +164,9 @@ public:
     void updateCamera();
     //Update Kinect mesh with Kinect
     void updateKinectMesh();
-    //Setup kinectV2
-    void setupKinect2();
+    void updateKinectV1Mesh();
+    //Setup kinectV1
+    void setupKinect();
     //Update CubeMap with selected one
     void updateCubeMap(int &cubeMapSelector);
     //Update mesh mode with selected parameter
@@ -188,4 +191,11 @@ public:
     void fadeToColor(float r, float g, float b, float speed);
     void addToFluid(ofVec2f pos, ofVec2f vel, bool addColor, bool addForce);
     void drawSolvers();
+    
+    //Kinect 1
+    int nearThreshold;
+    int farThreshold;
+    int angle;
+    bool bThreshWithOpenCV;
+    bool bDrawPointCloud;
 };
