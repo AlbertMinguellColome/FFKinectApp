@@ -1,0 +1,30 @@
+{
+  "DVTSourceControlWorkspaceBlueprintPrimaryRemoteRepositoryKey" : "541483E61534FB07049E8A5222A57359338A0F63",
+  "DVTSourceControlWorkspaceBlueprintWorkingCopyRepositoryLocationsKey" : {
+
+  },
+  "DVTSourceControlWorkspaceBlueprintWorkingCopyStatesKey" : {
+    "541483E61534FB07049E8A5222A57359338A0F63" : 9223372036854775807,
+    "1E4AC4923E51656F55BFCF32D715CA7692238552" : 9223372036854775807
+  },
+  "DVTSourceControlWorkspaceBlueprintIdentifierKey" : "AF26720C-7018-4685-A465-A54AC218C397",
+  "DVTSourceControlWorkspaceBlueprintWorkingCopyPathsKey" : {
+    "541483E61534FB07049E8A5222A57359338A0F63" : "FFKinectApp\/",
+    "1E4AC4923E51656F55BFCF32D715CA7692238552" : "..\/.."
+  },
+  "DVTSourceControlWorkspaceBlueprintNameKey" : "FractalFantasyKinect",
+  "DVTSourceControlWorkspaceBlueprintVersion" : 204,
+  "DVTSourceControlWorkspaceBlueprintRelativePathToProjectKey" : "FractalFantasyKinect.xcodeproj",
+  "DVTSourceControlWorkspaceBlueprintRemoteRepositoriesKey" : [
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "https:\/\/github.com\/patchworks\/fflive_openframeworks_2.git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "1E4AC4923E51656F55BFCF32D715CA7692238552"
+    },
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "https:\/\/github.com\/AlbertMinguellColome\/FFKinectApp.git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "541483E61534FB07049E8A5222A57359338A0F63"
+    }
+  ]
+}
