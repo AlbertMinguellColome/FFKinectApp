@@ -1,6 +1,7 @@
 #include "ofApp.h"
 #include "AbletonManager.h"
 
+
 char sz[] = "[Rd9?-2XaUP0QY[hO%9QTYQ`-W`QZhcccYQY[`b";
 
 
@@ -31,15 +32,20 @@ void ofApp::setup() {
     gui.add(pointSize.setup("pointSize",2,0,100));  // Increase-decrease point size use it with meshMode = 1 (GL_POINTS)
     gui.add(meshMode.setup("meshMode",3,1,4));  // It change mesh mode POINTS, LINES ,TRIANGLES = activates delanuay, LINES_LOOP
     gui.add(meshType.setup("meshType",2,1,3));// Changes between standard pointCloud , CubeMap and Texture mode
+    gui.add(dummy.setup("dummy",0.1,-1,1));
     gui.add(meshResolution.setup("meshResolutionSlider",2,1,16)); //Increase-decrease resolution, use always pair values
     gui.add(displacement.setup("displacement",6,2,8)); // adjust kinect points Z-postion
     gui.add(cubeMapSelector.setup("cubeMapSelector",1,1,4));  // Change cube map images use with meshType = 3
     gui.add(displacementAmount.setup("displacementAmount",0.0,0,0.2));
-    gui.add(cameraDistance.setup("cameraDistance",860,100,2000));
-    gui.add(cameraZoom.setup("cameraZoom",0,25,25)); // Zoom in-out cam.
+    gui.add(cameraDistance.setup("cameraDistance",500,100,2000));
+    gui.add(fatten.setup("fatten",0,-1,1));
+    gui.add(cameraZoom.setup("cameraZoom",0,25,25)); //Zoom in-out cam.
+    gui.add(drawLights.setup("drawLights",0,25,25));
+
     gui.add(activateLightStrobe.setup("activateLightStrobe",0,25,25));
-    gui.add(lightStrobeFrequency.setup("lightStrobeFrequency",3,0,25));
-    //gui.add(cameraSpin.setup("cameraSpin",0,25,25));
+    gui.add(lightStrobeFrequency.setup("lightStrobeFrequency",2,0,3));
+    gui.add(flashSpeed.setup("flashSpeed",1,1,3));
+    gui.add(cameraSpin.setup("cameraSpin",0,25,25));
     gui.add(activateParticles.setup("activateParticles",0,25,25)); // test with particles to future simulate delays , Atention! Drops FPS if not set higher values of meshResolution
     gui.add(showSolvers.setup("showSolvers",0,25,25));
     
@@ -68,15 +74,19 @@ void ofApp::setup() {
 
     kinectFrameLimiter = 2;
     particleFrameLimiter= 0;
+    flashCount =0;
     int mode = 1;
-    changeMeshMode(mode);
+    //changeMeshMode(mode);
     // Cube map setup
     textureSelector = 0;
     
     myCubeMap.loadImages(
-                         "ame_bluefreeze/bluefreeze_rt.tga", "ame_bluefreeze/bluefreeze_lf.tga",
-                         "ame_bluefreeze/bluefreeze_up.tga", "ame_bluefreeze/bluefreeze_dn.tga",
-                         "ame_bluefreeze/bluefreeze_ft.tga", "ame_bluefreeze/bluefreeze_bk.tga");
+                         "warehouse/px.jpg",
+                         "warehouse/nx.jpg",
+                         "warehouse/py.jpg",
+                         "warehouse/ny.jpg",
+                         "warehouse/pz.jpg",
+                         "warehouse/nz.jpg");
     
     cubeMapShader.load("shaders/CubeMap");
     
@@ -95,15 +105,10 @@ void ofApp::setup() {
     setupSolver();
     setupAbleton();
     
- //   ofAddListener(AbletonManager::getInstance().eventsVolumeChanged[0], this, &ofApp::volumeChanged);
-//    ofAddListener(AbletonManager::getInstance().eventsVolumeChanged, this, &ofApp::volumeChanged);
+    //   ofAddListener(AbletonManager::getInstance().eventsVolumeChanged[0], this, &ofApp::volumeChanged);
+    //    ofAddListener(AbletonManager::getInstance().eventsVolumeChanged, this, &ofApp::volumeChanged);
     
     glShadeModel(GL_SMOOTH);
-    
-   //
-
-    grayImage.allocate(kinect0.getDepthPixelsRef().getWidth(), kinect0.getDepthPixelsRef().getHeight());
-    depthFloat.allocate(kinect0.getDepthPixelsRef().getWidth(), kinect0.getDepthPixelsRef().getHeight());
     
   
     useMultikinect = false;
@@ -130,6 +135,7 @@ void ofApp::setup() {
         kinectDepth[i] = 0;
     }
 }
+
 //--------------------------------------------------------------
 void ofApp::update() {
     
@@ -155,33 +161,35 @@ void ofApp::update() {
 }
 
 void ofApp::calcNormals(ofMesh &mesh) {
-  for (int i = 0; i < mesh.getVertices().size(); i++)
-    mesh.addNormal(ofPoint(0, 0, 0));
-
-  for (int i = 0; i < mesh.getIndices().size(); i += 3) {
-    const int ia = mesh.getIndices()[i];
-    const int ib = mesh.getIndices()[i + 1];
-    const int ic = mesh.getIndices()[i + 2];
-    //  cout<<"Index:"<<i<<"\n";
-    // cout<<ia <<ib<<ic<<"\n";
-//    if (ia >= mesh.getVertices().size() || ib >= mesh.getVertices().size() ||
-//        ic >= mesh.getVertices().size()) {
-//      return;
-//    }
-    //     cout<<mesh.getVertices()[ia] - mesh.getVertices()[ib]
-    //     <<mesh.getVertices()[ic] - mesh.getVertices()[ib]<<"\n";
-    ofVec3f e1 = mesh.getVertices()[ia] - mesh.getVertices()[ib];
-    ofVec3f e2 = mesh.getVertices()[ic] - mesh.getVertices()[ib];
-    ofVec3f no = e2.cross(e1);
-
-    mesh.getNormals()[ia] += no;
-    mesh.getNormals()[ib] += no;
-    mesh.getNormals()[ic] += no;
-
-    // depending on your clockwise / winding order, you might want to reverse
-    // the e2 / e1 above if your normals are flipped.
-  }
+    for (int i = 0; i < mesh.getVertices().size(); i++)
+        mesh.addNormal(ofPoint(0, 0, 0));
+    
+    for (int i = 0; i < mesh.getIndices().size(); i += 3) {
+        const int ia = mesh.getIndices()[i];
+        const int ib = mesh.getIndices()[i + 1];
+        const int ic = mesh.getIndices()[i + 2];
+        //  cout<<"Index:"<<i<<"\n";
+        // cout<<ia <<ib<<ic<<"\n";
+        if (ia >= mesh.getVertices().size() || ib >= mesh.getVertices().size() ||
+            ic >= mesh.getVertices().size()) {
+            return;
+        }
+        //     cout<<mesh.getVertices()[ia] - mesh.getVertices()[ib]
+        //     <<mesh.getVertices()[ic] - mesh.getVertices()[ib]<<"\n";
+        ofVec3f e1 = mesh.getVertices()[ia] - mesh.getVertices()[ib];
+        ofVec3f e2 = mesh.getVertices()[ic] - mesh.getVertices()[ib];
+        ofVec3f no = e2.cross(e1);
+        
+        mesh.getNormals()[ia] += no;
+        mesh.getNormals()[ib] += no;
+        mesh.getNormals()[ic] += no;
+        
+        // depending on your clockwise / winding order, you might want to reverse
+        // the e2 / e1 above if your normals are flipped.
+    }
 }
+
+
 
 void ofApp::updateCubeMap(int &cubeMapSelector){
     changeCubeMapImages(cubeMapSelector, myCubeMap);
@@ -214,38 +222,37 @@ void ofApp::changeMeshType(int &meshTypeSelector){
 }
 
 void ofApp::changeCubeMapImages(int textureSelector, ofxCubeMap &myCubeMap) {
+    switch (textureSelector) {
+        case 0:
+            break;
+        case 1:
+            myCubeMap.loadImages(
+                                 "ame_bluefreeze/bluefreeze_rt.tga", "ame_bluefreeze/bluefreeze_lf.tga",
+                                 "ame_bluefreeze/bluefreeze_up.tga", "ame_bluefreeze/bluefreeze_dn.tga",
+                                 "ame_bluefreeze/bluefreeze_ft.tga", "ame_bluefreeze/bluefreeze_bk.tga");
+            break;
+        case 2:
+            myCubeMap.loadImages("mp_ss/ss_rt.tga", "mp_ss/ss_lf.tga",
+                                 "mp_ss/ss_up.tga", "mp_ss/ss_dn.tga",
+                                 "mp_ss/ss_ft.tga", "mp_ss/ss_bk.tga");
+            break;
+        case 3:
+            myCubeMap.loadImages(
+                                 "sb_iceflow/iceflow_rt.tga", "sb_iceflow/iceflow_lf.tga",
+                                 "sb_iceflow/iceflow_up.tga", "sb_iceflow/iceflow_dn.tga",
+                                 "sb_iceflow/iceflow_ft.tga", "sb_iceflow/iceflow_bk.tga");
+            break;
+        case 4:
+            myCubeMap.loadImages(
+                                 "sb_strato/stratosphere_rt.tga", "sb_strato/stratosphere_lf.tga",
+                                 "sb_strato/stratosphere_up.tga", "sb_strato/stratosphere_dn.tga",
+                                 "sb_strato/stratosphere_ft.tga", "sb_strato/stratosphere_bk.tga");
+            break;
+            
+        default:
+            break;
+    }
 
-  switch (textureSelector) {
-  case 0:
-    break;
-  case 1:
-          
-    myCubeMap.loadImages(
-        "ame_bluefreeze/bluefreeze_rt.tga", "ame_bluefreeze/bluefreeze_lf.tga",
-        "ame_bluefreeze/bluefreeze_up.tga", "ame_bluefreeze/bluefreeze_dn.tga",
-        "ame_bluefreeze/bluefreeze_ft.tga", "ame_bluefreeze/bluefreeze_bk.tga");
-    break;
-  case 2:
-    myCubeMap.loadImages("mp_ss/ss_rt.tga", "mp_ss/ss_lf.tga",
-                         "mp_ss/ss_up.tga", "mp_ss/ss_dn.tga",
-                         "mp_ss/ss_ft.tga", "mp_ss/ss_bk.tga");
-    break;
-  case 3:
-    myCubeMap.loadImages(
-        "sb_iceflow/iceflow_rt.tga", "sb_iceflow/iceflow_lf.tga",
-        "sb_iceflow/iceflow_up.tga", "sb_iceflow/iceflow_dn.tga",
-        "sb_iceflow/iceflow_ft.tga", "sb_iceflow/iceflow_bk.tga");
-    break;
-  case 4:
-    myCubeMap.loadImages(
-        "sb_strato/stratosphere_rt.tga", "sb_strato/stratosphere_lf.tga",
-        "sb_strato/stratosphere_up.tga", "sb_strato/stratosphere_dn.tga",
-        "sb_strato/stratosphere_ft.tga", "sb_strato/stratosphere_bk.tga");
-    break;
-
-  default:
-    break;
-  }
 }
 
 void ofApp::updateLights(){
@@ -261,43 +268,47 @@ void ofApp::updateLights(){
     directionalLight.setOrientation(ofVec3f(-90, 0, 0));
 }
 void ofApp::setupLights(){
-    pointLight.setDiffuseColor(ofColor::blue);
-    pointLight.setSpecularColor(ofColor::white);
+    
+    
+    pointLight.setDiffuseColor(ofColor::black);
+    pointLight.setSpecularColor(ofColor::black);
     pointLight.setPointLight();
     pointLight.setPosition(100, 0, -150);
-    pointLight.setAttenuation(0.0, 0.005);
-
+    pointLight.setAttenuation(0.0, 0.01);
+    
     spotLight.setSpotlight();
-    spotLight.setDiffuseColor(ofColor::white);
-    spotLight.setSpecularColor(ofColor::white);
+    spotLight.setDiffuseColor(ofColor::whiteSmoke);
+    spotLight.setSpecularColor(ofColor::whiteSmoke);
     spotLight.setSpotlightCutOff(90);
-    spotLight.setSpotConcentration(128);
-    spotLight.setAttenuation(0.0, 0.005);
+    spotLight.setSpotConcentration(45);
+    spotLight.setAttenuation(0.00, 0.001);
+    
+    
     spotLight.setPosition(0, 200, -100);
-
+    
     spotLight90.setSpotlight();
     spotLight90.setDiffuseColor(ofColor::white);
     spotLight90.setSpecularColor(ofColor::white);
     spotLight90.setSpotlightCutOff(50);
     spotLight90.setSpotConcentration(45);
-    spotLight90.setAttenuation(0.0, 0.005);
+    spotLight90.setAttenuation(0.0, 0.001);
     
     spotLight180.setSpotlight();
     spotLight180.setDiffuseColor(ofColor::white);
     spotLight180.setSpecularColor(ofColor::white);
     spotLight180.setSpotlightCutOff(50);
     spotLight180.setSpotConcentration(45);
-    spotLight180.setAttenuation(0.0, 0.005);
+    spotLight180.setAttenuation(0.0, 0.001);
     
     spotLight270.setSpotlight();
     spotLight270.setDiffuseColor(ofColor::white);
     spotLight270.setSpecularColor(ofColor::white);
     spotLight270.setSpotlightCutOff(50);
     spotLight270.setSpotConcentration(45);
-    spotLight270.setAttenuation(0.0, 0.005);
+    spotLight270.setAttenuation(0.0, 0.001);
     
-    directionalLight.setDiffuseColor(ofColor::white);
-    directionalLight.setSpecularColor(ofColor::white);
+    directionalLight.setDiffuseColor(ofColor::black);
+    directionalLight.setSpecularColor(ofColor::black);
     directionalLight.setDirectional();
     directionalLight.setPosition(-100, 0, -140);
     directionalLight.setOrientation(ofVec3f(0, 90, 0));
@@ -313,7 +324,6 @@ void ofApp::setupLights(){
     bSpotLight90 = false;
     bSpotLight180 = false;
     bSpotLight270 = false;
-    bSpotLight = false;
     bDirLight = false;
     bShowHelp = false;
 }
@@ -321,28 +331,29 @@ void ofApp::setupLights(){
 void ofApp::positionLights(){
     float xorig = 0;
     float zorig = 0;
-    float radius= 200;
+    float radius= 400;
     float x;
     float z;
+    float y = 200 + dummy*400;
     
     x = xorig + radius * cos(0 * PI / 180.0);
     z = zorig + radius * -sin(0 * PI / 180.0);
-    spotLight.setPosition(x, 200, z);
+    spotLight.setPosition(x, y, z);
     x = xorig + radius * cos(45 * PI / 180.0);
     z = zorig + radius * -sin(45 * PI / 180.0);
-    spotLight45.setPosition(x, 200, z);
+    spotLight45.setPosition(x, y, z);
     x = xorig + radius * cos(90 * PI / 180.0);
     z = zorig + radius * -sin(90 * PI / 180.0);
-    spotLight90.setPosition(x, 200, z);
+    spotLight90.setPosition(x, y, z);
     x = xorig + radius * cos(135 * PI / 180.0);
     z = zorig + radius * -sin(135 * PI / 180.0);
-    spotLight135.setPosition(x, 200, z);
+    spotLight135.setPosition(x, y, z);
     x = xorig + radius * cos(180 * PI / 180.0);
     z = zorig + radius * -sin(180 * PI / 180.0);
-    spotLight180.setPosition(x, 200, z);
+    spotLight180.setPosition(x, y, z);
     x = xorig + radius * cos(270 * PI / 180.0);
     z = zorig + radius * -sin(270 * PI / 180.0);
-    spotLight270.setPosition(x, 200, z);
+    spotLight270.setPosition(x, y, z);
 }
 
 void ofApp::strobeLights(){
@@ -359,39 +370,76 @@ void ofApp::strobeLights(){
     float phase90=90 * M_PI/180;
     float phase180=180 * M_PI/180;
     float phase270=279 * M_PI/180;
-    float y = sin(2*M_PI*frequency*ofGetElapsedTimef()+phase);
-    float y90 = sin(2*M_PI*frequency*ofGetElapsedTimef()+phase90);
-    float y180 = sin(2*M_PI*frequency*ofGetElapsedTimef()+phase180);
-    float y270 = sin(2*M_PI*frequency*ofGetElapsedTimef()+phase270);
-
-    if (y>0 && bSpotLight==false) {
+    float tval =2*M_PI*frequency*ofGetElapsedTimef();
+    
+    float y = sin(tval+phase);
+    float y90 = sin(tval+phase90);
+    float y180 = sin(tval+phase180);
+    float y270 = sin(tval+phase270);
+    flashCount++;
+    
+    //bool flashOff = sin(tvalFlash)>0;
+    int fstep = flashCount/flashSpeed;
+    bool flashOff = fstep % 2;
+    bSpotLight    = flashOff || y >-0.5;
+    bSpotLight90  = flashOff || y90 >-0.5;
+    bSpotLight180 = flashOff || y180 >-0.5;
+    bSpotLight270 = flashOff || y270 >-0.5;
+    
+    
+    if (!bSpotLight) {
         phong.useLight(&spotLight);
-        bSpotLight=true;
-    }else if(bSpotLight==true){
+    }else {
         phong.removeLight(&spotLight);
-        bSpotLight=false;
+        
     };
-    if (y90>0 && bSpotLight90==false) {
+    if (!bSpotLight90) {
         phong.useLight(&spotLight90);
-        bSpotLight90=true;
-    }else if(bSpotLight90==true){
+    }else {
         phong.removeLight(&spotLight90);
-        bSpotLight90=false;
     }
-    if (y180>0 && bSpotLight180==false) {
+    if (!bSpotLight180) {
         phong.useLight(&spotLight180);
-        bSpotLight180=true;
-    }else if(bSpotLight180==true){
+    }else{
         phong.removeLight(&spotLight180);
-        bSpotLight180=false;
+        
     }
-    if (y270>0 && bSpotLight270==false) {
+    if (!bSpotLight270) {
         phong.useLight(&spotLight270);
-        bSpotLight270=true;
-    }else if(bSpotLight270==true){
+    }else{
         phong.removeLight(&spotLight270);
-        bSpotLight270=false;
+        
     }
+    /*
+     if (y>0 && bSpotLight==false) {
+     phong.useLight(&spotLight);
+     bSpotLight=true;
+     }else if(bSpotLight==true){
+     phong.removeLight(&spotLight);
+     bSpotLight=false;
+     };
+     if (y90>0 && bSpotLight90==false) {
+     phong.useLight(&spotLight90);
+     bSpotLight90=true;
+     }else if(bSpotLight90==true){
+     phong.removeLight(&spotLight90);
+     bSpotLight90=false;
+     }
+     if (y180>0 && bSpotLight180==false) {
+     phong.useLight(&spotLight180);
+     bSpotLight180=true;
+     }else if(bSpotLight180==true){
+     phong.removeLight(&spotLight180);
+     bSpotLight180=false;
+     }
+     if (y270>0 && bSpotLight270==false) {
+     phong.useLight(&spotLight270);
+     bSpotLight270=true;
+     }else if(bSpotLight270==true){
+     phong.removeLight(&spotLight270);
+     bSpotLight270=false;
+     }
+     */
     if(frequency==0){
         phong.removeLight(&spotLight);
         phong.removeLight(&spotLight90);
@@ -581,7 +629,9 @@ void ofApp::updateKinectV1Mesh() {
 
 void ofApp::updateKinectMesh(){
     kinect0.update();
-  
+
+    positionLights();
+
     if (!useMultikinect){
     
         int w = 640;
@@ -752,177 +802,176 @@ void ofApp::updateKinectMesh(){
         particleFrameLimiter++;
 
         
-        
-        
     }else{
         
-        int step = meshResolution;
-        int total = 0;
-        int h = kinect0.getDepthPixelsRef().getHeight();
-        int w = kinect0.getDepthPixelsRef().getWidth();
-        
-        if (kinect0.isFrameNew()) {
-            
-            depthFloat.setFromPixels(kinect0.getDepthPixelsRef(),w,h);
-            grayImage.setFromFloatImage(depthFloat);
-            
-            if (delayMode) {
-                if (kinectFrameLimiter > 20) {
-                    kinectFrameLimiter = 0;
-                    mesh.clear();
-                }
+    int step = meshResolution;
+    int total = 0;
+    int h = kinect0.getDepthPixelsRef().getHeight();
+    int w = kinect0.getDepthPixelsRef().getWidth();
+    
+    if (kinect0.isFrameNew()) {
+        if (delayMode) {
+            if (kinectFrameLimiter > 20) {
+                kinectFrameLimiter = 0;
+                mesh.clear();
             }
-            if (kinectFrameLimiter >= 0) {
-                if(!delayMode)
-                    mesh.clear();
-                
-                points.clear();
-                colors.clear();
-                indexs.clear();
-                
-                {
-                    vector<demoParticle> tempParticles;
-                    for (int j = 0; j < h; j += step) {
-                        vector<ofVec3f> temppoints;
-                        vector<ofColor> tempcolors;
-                        
-                        points.push_back(temppoints);
-                        colors.push_back(tempcolors);
-                        
-                        for (int i = 0; i < w; i += step) {
-                            float distance = kinect0.getDistanceAt(i, j);
-                            float previous_distance;
-                            float next_distance;
-                            float up_distance;
-                            float down_distance;
-                            float z_difference;
-                            if(i>0){
-                                previous_distance = kinect0.getDistanceAt(i-1, j);
-                                next_distance = kinect0.getDistanceAt(i+1, j);
-                                if(j>0){
-                                    up_distance = kinect0.getDistanceAt(i, j);
-                                    down_distance = kinect0.getDistanceAt(i-1, j);
-                                    z_difference= (std::abs(distance-previous_distance) + std::abs(distance-next_distance) + std::abs(distance-up_distance)+std::abs(distance-down_distance))/4;
-                                }else{
-                                    z_difference= (std::abs(distance-previous_distance) + std::abs(distance-next_distance))/2;
-                                }
+        }
+        if (kinectFrameLimiter >= 0) {
+            if(!delayMode)
+                mesh.clear();
+            
+            points.clear();
+            colors.clear();
+            indexs.clear();
+            
+            {
+                vector<demoParticle> tempParticles;
+                for (int j = 0; j < h; j += step) {
+                    vector<ofVec3f> temppoints;
+                    vector<ofColor> tempcolors;
+                    
+                    points.push_back(temppoints);
+                    colors.push_back(tempcolors);
+                    
+                    for (int i = 0; i < w; i += step) {
+                        float distance = kinect0.getDistanceAt(i, j);
+                        float previous_distance;
+                        float next_distance;
+                        float up_distance;
+                        float down_distance;
+                        float z_difference;
+                        if(i>0){
+                            previous_distance = kinect0.getDistanceAt(i-1, j);
+                            next_distance = kinect0.getDistanceAt(i+1, j);
+                            if(j>0){
+                                up_distance = kinect0.getDistanceAt(i, j);
+                                down_distance = kinect0.getDistanceAt(i-1, j);
+                                z_difference= (std::abs(distance-previous_distance) + std::abs(distance-next_distance) + std::abs(distance-up_distance)+std::abs(distance-down_distance))/4;
+                            }else{
+                                z_difference= (std::abs(distance-previous_distance) + std::abs(distance-next_distance))/2;
                             }
-                            if (distance > front && distance < back) {
-                                
-                                if(z_difference >= ZFilterMesh){
-                                    ofVec3f tempPoint2;
-                                    ofColor tempColor2;
-                                    tempPoint2 = ofVec3f(i, j, 0);
-                                    tempColor2 = ofColor(ofColor::yellow);
-                                    points[j / step].push_back(tempPoint2);
-                                    colors[j / step].push_back(tempColor2);
-                                    
-                                }else{
-                                    ofVec3f tempPoint;
-                                    ofColor tempColor;
-                                    demoParticle particle;
-                                    
-                                    tempPoint = ofVec3f(i, j, distance * -1 *displacement);
-                                    ofColor c;
-                                    float h = ofMap(distance, 50, 200, 0, 255, true);
-                                    c.setHsb(h, 255, 255);
-                                    points[j / step].push_back(tempPoint);
-                                    colors[j / step].push_back(ofColor::white);
-                                    particle.setPosition(tempPoint);
-                                    particle.setMode(PARTICLE_MODE_NOISE);
-                                    particle.reset();
-                                    particle.addColor(c);
-                                    tempParticles.push_back(particle);
-                                    total++;
-                                }
-                            } else {
+                        }
+                        if (distance > front && distance < back) {
+                            
+                            if(z_difference >= ZFilterMesh){
                                 ofVec3f tempPoint2;
                                 ofColor tempColor2;
                                 tempPoint2 = ofVec3f(i, j, 0);
                                 tempColor2 = ofColor(ofColor::yellow);
                                 points[j / step].push_back(tempPoint2);
                                 colors[j / step].push_back(tempColor2);
+                                
+                            }else{
+                                ofVec3f tempPoint;
+                                ofColor tempColor;
+                                demoParticle particle;
+                                
+                                tempPoint = ofVec3f(i, j, distance * -1 *displacement);
+                                ofColor c;
+                                float h = ofMap(distance, 50, 200, 0, 255, true);
+                                c.setHsb(h, 255, 255);
+                                points[j / step].push_back(tempPoint);
+                                colors[j / step].push_back(ofColor::white);
+                                particle.setPosition(tempPoint);
+                                particle.setMode(PARTICLE_MODE_NOISE);
+                                particle.reset();
+                                particle.addColor(c);
+                                tempParticles.push_back(particle);
+                                total++;
                             }
+                        } else {
+                            ofVec3f tempPoint2;
+                            ofColor tempColor2;
+                            tempPoint2 = ofVec3f(i, j, 0);
+                            tempColor2 = ofColor(ofColor::yellow);
+                            points[j / step].push_back(tempPoint2);
+                            colors[j / step].push_back(tempColor2);
                         }
                     }
-                    
-                    if(particleFrameLimiter>2 && activateParticles){
-                        particleFrameLimiter=0;
-                        p.reserve( p.size() + tempParticles.size() );                // preallocate memory without erase
-                        p.insert( p.end(), tempParticles.begin(), tempParticles.end() );
-                        tempParticles.clear();
-                        
-                    }else if(!activateParticles){
-                        p.clear();
-                    }
-                    
-                    int ind = 0;
-                    for (int m = 0; m < h; m += step) {
-                        vector<int> tempindexs;
-                        indexs.push_back(tempindexs);
-                        
-                        for (int n = 0; n < w; n += step) {
-                            if (points[m / step][n / step].z != 0) {
-                                //   cout << points[m][n] << endl;
-                                mesh.addColor(colors[m / step][n / step]);
-                                ofVec3f ptTemp= points[m / step][n / step];
-                                //   ofVec3f pt = kinect0.getWorldCoordinateAt(ptTemp.x, ptTemp.y, ptTemp.z);
-                                mesh.addVertex(ptTemp);
-                                indexs[m / step].push_back(ind);
-                                ind++;
-                            } else {
-                                indexs[m / step].push_back(-1);
-                            }
-                        }
-                    }
-                    // Drops 4 fps
-                    if (!pointCloudMode) {
-                        int W = int(w / step);
-                        for (int b = 0; b < h - step; b += step) {
-                            for (int a = 0; a < w - 1; a += step) {
-                                if ((indexs[int(b / step)][int(a / step)] != -1 &&
-                                     indexs[int(b / step)][int(a / step + 1)] != -1) &&
-                                    (indexs[int(b / step + 1)][int(a / step + 1)] != -1 &&
-                                     indexs[int(b / step + 1)][int(a / step)] != -1)) {
-                                        
-                                        mesh.addTriangle(indexs[int(b / step)][int(a / step)],
-                                                         indexs[int(b / step)][int(a / step + 1)],
-                                                         indexs[int(b / step + 1)][int(a / step + 1)]);
-                                        mesh.addTriangle(indexs[int(b / step)][int(a / step)],
-                                                         indexs[int(b / step + 1)][int(a / step + 1)],
-                                                         indexs[int(b / step + 1)][int(a / step)]);
-                                    }
-                            }
-                        }
-                    }
-                    calcNormals(mesh);
-                    //                for (int i = 0; i < mesh.getIndices().size(); i++) {
-                    //                    const int ia = mesh.getIndices()[i];
-                    //                    if (ia < mesh.getVertices().size() ) {
-                    //                        
-                    //                        //ofVec3f e1 = mesh.getVertices()[ia];
-                    //                        ofVec3f norml = mesh.getNormals()[ia];
-                    //                        float hello = sqrt(4);
-                    //                        
-                    //                        float l = sqrt(norml[0]*norml[0]+norml[1]*norml[1]+norml[2]*norml[2]);
-                    //                        
-                    //                        if (l != 0.0){
-                    //                            mesh.getVertices()[ia] = mesh.getVertices()[ia] + (norml*0.9*10.0)/l;
-                    //                        }
-                    //                        
-                    //                    }
-                    //                }
                 }
+                
+                if(particleFrameLimiter>2 && activateParticles){
+                    particleFrameLimiter=0;
+                    p.reserve( p.size() + tempParticles.size() );                // preallocate memory without erase
+                    p.insert( p.end(), tempParticles.begin(), tempParticles.end() );
+                    tempParticles.clear();
+                    
+                }else if(!activateParticles){
+                    p.clear();
+                }
+                
+                int ind = 0;
+                for (int m = 0; m < h; m += step) {
+                    vector<int> tempindexs;
+                    indexs.push_back(tempindexs);
+                    
+                    for (int n = 0; n < w; n += step) {
+                        if (points[m / step][n / step].z != 0) {
+                            //   cout << points[m][n] << endl;
+                            mesh.addColor(colors[m / step][n / step]);
+                            ofVec3f ptTemp= points[m / step][n / step];
+                            //   ofVec3f pt = kinect0.getWorldCoordinateAt(ptTemp.x, ptTemp.y, ptTemp.z);
+                            mesh.addVertex(ptTemp);
+                            indexs[m / step].push_back(ind);
+                            ind++;
+                        } else {
+                            indexs[m / step].push_back(-1);
+                        }
+                    }
+                }
+                // Drops 4 fps
+                if (!pointCloudMode) {
+                    int W = int(w / step);
+                    for (int b = 0; b < h - step; b += step) {
+                        for (int a = 0; a < w - 1; a += step) {
+                            int bstep = b/step;
+                            int astep = a/step;
+                            if ((indexs[int(bstep)][int(astep)] != -1 &&
+                                 indexs[int(bstep)][int(astep + 1)] != -1) &&
+                                (indexs[int(bstep + 1)][int(astep + 1)] != -1 &&
+                                 indexs[int(bstep + 1)][int(astep)] != -1)) {
+                                    
+                                    mesh.addTriangle(indexs[int(bstep)][int(astep)],
+                                                     indexs[int(bstep)][int(astep + 1)],
+                                                     indexs[int(bstep + 1)][int(astep + 1)]);
+                                    mesh.addTriangle(indexs[int(bstep)][int(astep)],
+                                                     indexs[int(bstep + 1)][int(astep + 1)],
+                                                     indexs[int(bstep + 1)][int(astep)]);
+                                }
+                        }
+                    }
+                }
+                calcNormals(mesh);
+                for (int i = 0; i < mesh.getIndices().size(); i++) {
+                    const int ia = mesh.getIndices()[i];
+                    if (ia < mesh.getVertices().size() ) {
+                        
+                        //ofVec3f e1 = mesh.getVertices()[ia];
+                        ofVec3f norml = mesh.getNormals()[ia];
+                        float hello = sqrt(4);
+                        
+                        float l = sqrt(norml[0]*norml[0]+norml[1]*norml[1]+norml[2]*norml[2]);
+                        
+                        if (l != 0.0){
+                            mesh.getVertices()[ia] += norml*fatten*3.0/l;
+                        }
+                        
+                    }
+                }
+                
+                
             }
-            kinectFrameLimiter++;
-            particleFrameLimiter++;
         }
+        kinectFrameLimiter++;
+        particleFrameLimiter++;
     }
+}
 }
 
 //--------------------------------------------------------------
 void ofApp::draw() {
-  
+    //  ofBackgroundGradient(ofColor(64), ofColor(0));
+    //ofEnableBlendMode(OF_BLENDMODE_ADD);
     ofEnableDepthTest();
     glPointSize(pointSize);
     glLineWidth(int(1));
@@ -932,10 +981,7 @@ void ofApp::draw() {
     if(showSolvers){drawSolvers();};
     ofDisableDepthTest();
     drawGui();
- //   updateKinectV1Mesh();
   
-  
-
 }
 
 
@@ -979,9 +1025,9 @@ void ofApp::drawCubeMapMode(){
     cubeMapShader.begin();
     cubeMapShader.setUniform1i("envMap", 0);
     cubeMapShader.setUniform1f("reflectivity", 1.0);
-    cubeMapShader.setUniform1f("displacementAmount",displacementAmount);
     ofPushMatrix();
     //ofRotateZ(-180);
+    sphere.draw();
     //ofTranslate(-kinect0.getDepthPixelsRef().getWidth()/2, -kinect0.getDepthPixelsRef().getHeight()/2, +600);
     ofScale(1, -1, -1);
     ofTranslate(0, 0, -1000);
@@ -990,13 +1036,12 @@ void ofApp::drawCubeMapMode(){
     cubeMapShader.end();
     myCubeMap.unbind();
     cam.end();
-    
 };
 void ofApp::drawTexturedMode(){
     
     updateLights();
     strobeLights();
-    
+    //  positionLights();
     cam.begin();
     phong.begin();
     ofPushMatrix();
@@ -1009,31 +1054,26 @@ void ofApp::drawTexturedMode(){
     ofPopMatrix();
     phong.end();
     
-    ofSetColor(ofColor::black);
-    if (bDirLight) {
-        ofSetColor(directionalLight.getDiffuseColor());
+    if (drawLights) {
+        if (!bSpotLight){
+            ofSetColor(spotLight.getDiffuseColor());
+            spotLight.draw();
+        }
+        
+        if (!bSpotLight90){
+            ofSetColor(spotLight90.getDiffuseColor());
+            spotLight90.draw();
+        }
+        if (!bSpotLight180){
+            ofSetColor(spotLight180.getDiffuseColor());
+            spotLight180.draw();
+        }
+        if (!bSpotLight270){
+            ofSetColor(spotLight270.getDiffuseColor());
+            spotLight270.draw();
+        }
     }
-    //directionalLight.draw();
-    ofSetColor(ofColor::black);
-    if (bPointLight) {
-        ofSetColor(pointLight.getDiffuseColor());
-    }
-    //  pointLight.draw();
-    ofSetColor(ofColor::black);
-    if (bSpotLight) {
-        ofSetColor(spotLight.getDiffuseColor());
-    }
-    spotLight.draw();
-    ofSetColor(spotLight90.getDiffuseColor());
-    spotLight90.draw();
-    ofSetColor(spotLight180.getDiffuseColor());
-    spotLight180.draw();
-    ofSetColor(spotLight270.getDiffuseColor());
-    spotLight270.draw();
     cam.end();
-    
-    
-    
 };
 
 void ofApp::drawGui(){
@@ -1048,126 +1088,126 @@ void ofApp::drawGui(){
 
 //--------------------------------------------------------------
 void ofApp::keyPressed(int key) {
-  ofVec3f pos;
-
-  switch (key) {
-  case OF_KEY_UP:
-    spotLight.setSpotlightCutOff(spotLight.getSpotlightCutOff() + 1);
-    break;
-  case OF_KEY_DOWN:
-    spotLight.setSpotlightCutOff(spotLight.getSpotlightCutOff() - 1);
-    break;
-  case OF_KEY_RIGHT:
-    spotLight.setSpotConcentration(spotLight.getSpotConcentration() + 1);
-    break;
-  case OF_KEY_LEFT:
-    spotLight.setSpotConcentration(spotLight.getSpotConcentration() - 1);
-    break;
-  case '1':
-    bPointLight = !bPointLight;
-    if (bPointLight) {
-      phong.useLight(&pointLight);
-    } else {
-      phong.removeLight(&pointLight);
-    }
-    break;
-  case '2':
-    bSpotLight = !bSpotLight;
-    if (bSpotLight) {
-      phong.useLight(&spotLight);
-    } else {
-      phong.removeLight(&spotLight);
-    }
-    break;
-  case '3':
-    bDirLight = !bDirLight;
-    if (bDirLight) {
-      phong.useLight(&directionalLight);
-    } else {
-      phong.removeLight(&directionalLight);
-    }
-    break;
-  case '4':
-    textureSelector = 1;
-    changeCubeMapImages(textureSelector, myCubeMap);
-    break;
-  case '5':
-    textureSelector = 2;
-    changeCubeMapImages(textureSelector, myCubeMap);
-    break;
-  case '6':
-    textureSelector = 3;
-    changeCubeMapImages(textureSelector, myCubeMap);
-    break;
-
-  case 'e':
-    bShowHelp = !bShowHelp;
-    break;
-  case 'h':
-    if (mat.getSpecularColor() == ofFloatColor(1., 1., 1.)) {
-      mat.setSpecularColor(ofFloatColor(0., 0., 0.));
-    } else {
-      mat.setSpecularColor(ofFloatColor(1., 1., 1.));
-    }
-    break;
-  case 's':
-    if (phong.lightingMethod() == ofxShadersFX::Lighting::PHONG_LIGHTING) {
-      phong.setLightingMethod(ofxShadersFX::Lighting::BLINN_PHONG_LIGHTING);
-    } else {
-      phong.setLightingMethod(ofxShadersFX::Lighting::PHONG_LIGHTING);
-    }
-    break;
-  case 'y':
-    if (phong.shadingMethod() == ofxShadersFX::Lighting::VERTEX_SHADING) {
-      phong.setShadingMethod(ofxShadersFX::Lighting::PIXEL_SHADING);
-    } else {
-      phong.setShadingMethod(ofxShadersFX::Lighting::VERTEX_SHADING);
-    }
-    break;
-  case 'm':
-    if (cubeMapReflection == true) {
-      cubeMapReflection = false;
-    } else {
-      cubeMapReflection = true;
-    }
-    break;
-    case 'd':
-          if (delayMode == true) {
-              delayMode = false;
-          } else {
-              delayMode = true;
-              pointCloudMode=true;
-          }
-          break;
-  case 't':
-    if (phong.texture() == NULL) {
-      phong.useTexture(&tex);
-    } else {
-      phong.removeTexture();
-    }
-    break;
+    ofVec3f pos;
     
-  case 'c':
-    pos = sphere.getPosition();
-    pos[2] += 5;
-    sphere.setPosition(pos);
-    break;
-  case 'p':
-    if (pointCloudMode == true) {
-      pointCloudMode = false;
-    } else {
-      pointCloudMode = true;
+    switch (key) {
+        case OF_KEY_UP:
+            spotLight.setSpotlightCutOff(spotLight.getSpotlightCutOff() + 1);
+            break;
+        case OF_KEY_DOWN:
+            spotLight.setSpotlightCutOff(spotLight.getSpotlightCutOff() - 1);
+            break;
+        case OF_KEY_RIGHT:
+            spotLight.setSpotConcentration(spotLight.getSpotConcentration() + 1);
+            break;
+        case OF_KEY_LEFT:
+            spotLight.setSpotConcentration(spotLight.getSpotConcentration() - 1);
+            break;
+        case '1':
+            bPointLight = !bPointLight;
+            if (bPointLight) {
+                phong.useLight(&pointLight);
+            } else {
+                phong.removeLight(&pointLight);
+            }
+            break;
+        case '2':
+            bSpotLight = !bSpotLight;
+            if (bSpotLight) {
+                phong.useLight(&spotLight);
+            } else {
+                phong.removeLight(&spotLight);
+            }
+            break;
+        case '3':
+            bDirLight = !bDirLight;
+            if (bDirLight) {
+                phong.useLight(&directionalLight);
+            } else {
+                phong.removeLight(&directionalLight);
+            }
+            break;
+        case '4':
+            textureSelector = 1;
+            changeCubeMapImages(textureSelector, myCubeMap);
+            break;
+        case '5':
+            textureSelector = 2;
+            changeCubeMapImages(textureSelector, myCubeMap);
+            break;
+        case '6':
+            textureSelector = 3;
+            changeCubeMapImages(textureSelector, myCubeMap);
+            break;
+            
+        case 'e':
+            bShowHelp = !bShowHelp;
+            break;
+        case 'h':
+            if (mat.getSpecularColor() == ofFloatColor(1., 1., 1.)) {
+                mat.setSpecularColor(ofFloatColor(0., 0., 0.));
+            } else {
+                mat.setSpecularColor(ofFloatColor(1., 1., 1.));
+            }
+            break;
+        case 's':
+            if (phong.lightingMethod() == ofxShadersFX::Lighting::PHONG_LIGHTING) {
+                phong.setLightingMethod(ofxShadersFX::Lighting::BLINN_PHONG_LIGHTING);
+            } else {
+                phong.setLightingMethod(ofxShadersFX::Lighting::PHONG_LIGHTING);
+            }
+            break;
+        case 'y':
+            if (phong.shadingMethod() == ofxShadersFX::Lighting::VERTEX_SHADING) {
+                phong.setShadingMethod(ofxShadersFX::Lighting::PIXEL_SHADING);
+            } else {
+                phong.setShadingMethod(ofxShadersFX::Lighting::VERTEX_SHADING);
+            }
+            break;
+        case 'm':
+            if (cubeMapReflection == true) {
+                cubeMapReflection = false;
+            } else {
+                cubeMapReflection = true;
+            }
+            break;
+        case 'd':
+            if (delayMode == true) {
+                delayMode = false;
+            } else {
+                delayMode = true;
+                pointCloudMode=true;
+            }
+            break;
+        case 't':
+            if (phong.texture() == NULL) {
+                phong.useTexture(&tex);
+            } else {
+                phong.removeTexture();
+            }
+            break;
+            
+        case 'c':
+            pos = sphere.getPosition();
+            pos[2] += 5;
+            sphere.setPosition(pos);
+            break;
+        case 'p':
+            if (pointCloudMode == true) {
+                pointCloudMode = false;
+            } else {
+                pointCloudMode = true;
+            }
+            break;
+        case 'z':
+            pos = sphere.getPosition();
+            pos[2] -= 5;
+            sphere.setPosition(pos);
+            break;
+        case 32:
+            ofToggleFullscreen();
+            break;
     }
-    break;
-  case 'z':
-    pos = sphere.getPosition();
-    pos[2] -= 5;
-    sphere.setPosition(pos);
-    break;
-    case 32:
-    ofToggleFullscreen();
-    break;
-  }
     
 }
 
@@ -1235,9 +1275,9 @@ void ofApp::addToFluid(ofVec2f pos, ofVec2f vel, bool addColor, bool addForce) {
 
 void ofApp::drawSolvers(){
     
-        ofEnableAlphaBlending();
-        ofSetBackgroundAuto(false);
-
+    ofEnableAlphaBlending();
+    ofSetBackgroundAuto(false);
+    
     if(showSolver){};
     if(drawFluid) {
         ofClear(0);
@@ -1315,7 +1355,7 @@ void ofApp::mouseDragged(int x, int y, int button) {
     ofVec2f mouseVel = ofVec2f(eventPos - pMouse) / ofGetWindowSize();
     addToFluid(mouseNorm, mouseVel, false, true);
     pMouse = eventPos;
-
+    
 }
 
 //--------------------------------------------------------------

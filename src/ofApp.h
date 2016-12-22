@@ -10,9 +10,8 @@
 #include "ParticleSystem.h"
 #include "demoParticle.h"
 #include "SettingsManager.h"
-#include "ofxOpenCv.h"
-#include "ofxKinectV2.h"
 #include "ofxKinect.h"
+#include "ofxOpenCv.h"
 
 enum meshType
 {
@@ -25,8 +24,9 @@ class ofApp : public ofBaseApp{
     
 public:
     
+    
     ofxCvColorImage colorImg;
-    ofxCvFloatImage depthFloat;
+    ofFloatImage depthFloat;
     
     ofxCvGrayscaleImage grayImage; // grayscale depth image
     ofxCvGrayscaleImage grayThreshNear; // the near thresholded image
@@ -52,7 +52,6 @@ public:
     ofSpherePrimitive sphere;
     ofSpherePrimitive test;
     
-    bool useMultikinect;
     bool bPointLight;
     bool bSpotLight;
     bool bSpotLight90;
@@ -71,10 +70,11 @@ public:
     float camCurrentX;
     float camCurrentY;
     float camCurrentAngle;
+    float useMultikinect;
+    int flashCount;
     
     ofImage tex;
     ofxMultiKinectV2 kinect0;
-    vector < shared_ptr<ofxKinectV2> > kinects;
     ofxKinect kinect;
     ofVboMesh mesh;
     enum meshType meshtype;
@@ -86,7 +86,6 @@ public:
     ofxCubeMap myCubeMap;
     ofShader cubeMapShader;
     
-    
     int textureSelector;
     int kinectFrameLimiter;
     int particleFrameLimiter;
@@ -94,6 +93,7 @@ public:
     //Gui Panel
     ofxPanel gui;
     ofxIntSlider  front;
+    ofxFloatSlider  dummy;
     ofxIntSlider  back;
     ofxIntSlider  pointSize;
     ofxIntSlider  meshMode;
@@ -102,18 +102,21 @@ public:
     ofxIntSlider  displacement;
     ofxIntSlider  meshType;
     ofxIntSlider  cutoff;
-    ofxIntSlider  lightStrobeFrequency;
+    ofxIntSlider flashSpeed;
+    ofxFloatSlider lightStrobeFrequency;
+    ofxIntSlider  displacementAmount;
     ofxFloatSlider cameraDistance;
     ofxFloatSlider ZFilterMesh;
+    ofxFloatSlider fatten;
     ofxToggle showSolvers;
     ofxToggle cameraZoom;
     ofxToggle cameraSpin;
     ofxToggle showSolver;
+    ofxToggle drawLights;
     ofxToggle activateParticles;
     ofxToggle activatePointCloud;
     ofxToggle activateLightStrobe;
     ofxIntSlider  cubeMapSelector;
-    ofxFloatSlider displacementAmount;
     ofxFloatSlider temporalSmoothing;
     
     //Solver
@@ -134,7 +137,7 @@ public:
     vector <demoParticle> p;
     vector <ofPoint> attractPoints;
     vector <ofPoint> attractPointsWithMovement;
-
+    
     
     
     void setup();
@@ -168,6 +171,8 @@ public:
     void updateCamera();
     //Update Kinect mesh with Kinect
     void updateKinectMesh();
+    //Setup kinectV2
+    void setupKinect2();
     void updateKinectV1Mesh();
     //Setup kinectV1
     void setupKinect();
@@ -188,7 +193,7 @@ public:
     //Activates strobe lights
     void strobeLights();
     
-   // void volumeChanged(float &newVolume);
+    // void volumeChanged(float &newVolume);
     
     //Solver
     void setupSolver();
