@@ -24,16 +24,18 @@ void ofApp::setup() {
     gui.setup();
     gui.setPosition(0, 40);
     gui.add(ZFilterMesh.setup("ZFilterMesh",1.5,0,10));
-    gui.add(front.setup("frontSlider",0,0,1500));
-    gui.add(back.setup("backSlider",0,0,8000));
+    gui.add(front.setup("frontSlider",607,0,1500));
+    gui.add(back.setup("backSlider",1680,0,8000));
+    gui.add(smoothCount.setup("smoothCount",0,1,10));
+    gui.add(temporalSmoothing.setup("temporalSmoothing",0,0,1));
     gui.add(pointSize.setup("pointSize",2,0,100));  // Increase-decrease point size use it with meshMode = 1 (GL_POINTS)
-    gui.add(meshMode.setup("meshMode",1,1,4));  // It change mesh mode POINTS, LINES ,TRIANGLES = activates delanuay, LINES_LOOP
-    gui.add(meshType.setup("meshType",1,1,3));// Changes between standard pointCloud , CubeMap and Texture mode
+    gui.add(meshMode.setup("meshMode",3,1,4));  // It change mesh mode POINTS, LINES ,TRIANGLES = activates delanuay, LINES_LOOP
+    gui.add(meshType.setup("meshType",2,1,3));// Changes between standard pointCloud , CubeMap and Texture mode
     gui.add(meshResolution.setup("meshResolutionSlider",2,1,16)); //Increase-decrease resolution, use always pair values
     gui.add(displacement.setup("displacement",6,2,8)); // adjust kinect points Z-postion
     gui.add(cubeMapSelector.setup("cubeMapSelector",1,1,4));  // Change cube map images use with meshType = 3
     gui.add(displacementAmount.setup("displacementAmount",0.0,0,0.2));
-    gui.add(cameraDistance.setup("cameraDistance",500,100,2000));
+    gui.add(cameraDistance.setup("cameraDistance",860,100,2000));
     gui.add(cameraZoom.setup("cameraZoom",0,25,25)); // Zoom in-out cam.
     gui.add(activateLightStrobe.setup("activateLightStrobe",0,25,25));
     gui.add(lightStrobeFrequency.setup("lightStrobeFrequency",3,0,25));
@@ -119,6 +121,13 @@ void ofApp::setup() {
         kinect0.update();
     }else{
           setupKinect();
+    }
+    int w = 640;
+    int h = 480;
+    
+    kinectDepth.allocate(w, h, 1);
+    for(int i = 0; i < h*w; i++){
+        kinectDepth[i] = 0;
     }
 }
 //--------------------------------------------------------------
@@ -210,6 +219,7 @@ void ofApp::changeCubeMapImages(int textureSelector, ofxCubeMap &myCubeMap) {
   case 0:
     break;
   case 1:
+          
     myCubeMap.loadImages(
         "ame_bluefreeze/bluefreeze_rt.tga", "ame_bluefreeze/bluefreeze_lf.tga",
         "ame_bluefreeze/bluefreeze_up.tga", "ame_bluefreeze/bluefreeze_dn.tga",
@@ -421,11 +431,79 @@ void ofApp::updateCamera(){
     cam.setDistance(cameraDistance);
 }
 
+static void smoothArray( ofShortPixels &pix ){
+//    printf("IN SMOOTH!\n");
+    int w = 640;
+    int h = 480;
+    ofShortPixels tempPixels;
+    tempPixels.allocate(w, h, 1);
+    
+    for(int y = 1; y<h-1; y++ ){
+        for(int x = 1; x<w-1; x++){
+            int index = x + y*w;
+            tempPixels[index] = 0;
+            if( pix[index] != 0 ){
+                int base = pix[index];
+                int total = 0;
+                int numAdded = 0;
+                for( int ty = y-1; ty <= y+1; ty++){
+                    for( int tx = x-1; tx <= x+1; tx++){
+                        int index2 = tx + ty*w;
+                        if( abs(pix[index2] - base) < 20 ){
+                            total += pix[index2];
+                            numAdded++;
+                        }
+                    }
+                    
+                }
+                if( numAdded > 0){
+                    tempPixels[index] = (float)total/(float)numAdded;
+                }
+            }
+        }
+    }
+    for(int y = 1; y<h-1; y++ ){
+        for(int x = 1; x<w-1; x++){
+            int index = x + y*w;
+//            pix[index] = 0;
+            pix[index] = tempPixels[index];
+        }
+    }
+}
+
+
 void ofApp::updateKinectV1Mesh() {
     kinect.update();
     
+    
+    ofShortPixels & pix = kinect.getRawDepthPixels();
     int w = 640;
     int h = 480;
+   
+    for(int i = 0; i < smoothCount; i++ ){
+        smoothArray( pix );
+    }
+    if(temporalSmoothing != 0.0){
+        for(int i = 0; i < h*w; i++){
+            int diff =pix[i] - kinectDepth[i];
+            int pixd = pix[i];
+            
+            if(abs(diff) > 90){
+                kinectDepth[i] = pixd;
+                /*
+                pixd = kinectDepth[i];
+                if( diff > 0 ){
+                    pixd += 90;
+                }else{
+                    pixd -= 90;
+                }
+                 */
+            }
+            kinectDepth[i] = kinectDepth[i] * temporalSmoothing + pixd * (1.0-temporalSmoothing);
+            pix[i] = kinectDepth[i];
+        }
+    }
+
     //ofMesh mesh;
 //    mesh.setMode(OF_PRIMITIVE_TRIANGLES);
     mesh.clear();
@@ -500,10 +578,10 @@ void ofApp::updateKinectV1Mesh() {
     }
 }
 
+
 void ofApp::updateKinectMesh(){
     kinect0.update();
-    
-    
+  
     if (!useMultikinect){
     
         int w = 640;

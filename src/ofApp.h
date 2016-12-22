@@ -31,6 +31,8 @@ public:
     ofxCvGrayscaleImage grayImage; // grayscale depth image
     ofxCvGrayscaleImage grayThreshNear; // the near thresholded image
     ofxCvGrayscaleImage grayThreshFar;
+    
+    ofShortPixels kinectDepth;
 
     ofLight pointLight;
     ofLight directionalLight;
@@ -95,6 +97,7 @@ public:
     ofxIntSlider  back;
     ofxIntSlider  pointSize;
     ofxIntSlider  meshMode;
+    ofxIntSlider  smoothCount;
     ofxIntSlider  meshResolution;
     ofxIntSlider  displacement;
     ofxIntSlider  meshType;
@@ -111,6 +114,7 @@ public:
     ofxToggle activateLightStrobe;
     ofxIntSlider  cubeMapSelector;
     ofxFloatSlider displacementAmount;
+    ofxFloatSlider temporalSmoothing;
     
     //Solver
     float                   colorMult;
