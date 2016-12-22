@@ -41,7 +41,6 @@ void ofApp::setup() {
     gui.add(fatten.setup("fatten",0,-1,1));
     gui.add(cameraZoom.setup("cameraZoom",0,25,25)); //Zoom in-out cam.
     gui.add(drawLights.setup("drawLights",0,25,25));
-
     gui.add(activateLightStrobe.setup("activateLightStrobe",0,25,25));
     gui.add(lightStrobeFrequency.setup("lightStrobeFrequency",2,0,3));
     gui.add(flashSpeed.setup("flashSpeed",1,1,3));
@@ -222,6 +221,7 @@ void ofApp::changeMeshType(int &meshTypeSelector){
 }
 
 void ofApp::changeCubeMapImages(int textureSelector, ofxCubeMap &myCubeMap) {
+
     switch (textureSelector) {
         case 0:
             break;
@@ -252,7 +252,6 @@ void ofApp::changeCubeMapImages(int textureSelector, ofxCubeMap &myCubeMap) {
         default:
             break;
     }
-
 }
 
 void ofApp::updateLights(){
@@ -629,6 +628,7 @@ void ofApp::updateKinectV1Mesh() {
 
 void ofApp::updateKinectMesh(){
     kinect0.update();
+
 
     positionLights();
 
