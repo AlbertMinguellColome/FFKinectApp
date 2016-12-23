@@ -1007,7 +1007,7 @@ void ofApp::drawPointCloudMode(){
         ofPushStyle();
         glPointSize(pointSize);
         cam.begin();
-        ofDrawAxis(200);
+        // ofDrawAxis(200);
         ofPushMatrix();
         //ofRotateZ(-180);
         ofTranslate(-kinect0.getDepthPixelsRef().getWidth()/2, -kinect0.getDepthPixelsRef().getHeight()/2, +600);
@@ -1067,7 +1067,7 @@ void ofApp::drawTexturedMode(){
     ofScale(1, -1, -1);
    // ofTranslate(0, 0, -1000);
     mesh.drawFaces();
-    ofDrawAxis(100);
+    //ofDrawAxis(100);
     ofPopMatrix();
     phong.end();
     
