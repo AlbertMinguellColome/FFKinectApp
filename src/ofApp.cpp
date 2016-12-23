@@ -24,22 +24,22 @@ void ofApp::setup() {
     
     gui.setup();
     gui.setPosition(0, 40);
-    gui.add(ZFilterMesh.setup("ZFilterMesh",1.5,0,10));
-    gui.add(front.setup("frontSlider",607,0,1500));
-    gui.add(back.setup("backSlider",1680,0,8000));
+    //gui.add(ZFilterMesh.setup("ZFilterMesh",1.5,0,10));
+    gui.add(front.setup("frontSlider",315,0,1500));
+    gui.add(back.setup("backSlider",880,0,8000));
     gui.add(smoothCount.setup("smoothCount",0,1,10));
-    gui.add(temporalSmoothing.setup("temporalSmoothing",0,0,1));
+    gui.add(temporalSmoothing.setup("temporalSmoothing",0.31,0,1));
     gui.add(pointSize.setup("pointSize",2,0,100));  // Increase-decrease point size use it with meshMode = 1 (GL_POINTS)
     gui.add(meshMode.setup("meshMode",3,1,4));  // It change mesh mode POINTS, LINES ,TRIANGLES = activates delanuay, LINES_LOOP
     gui.add(meshType.setup("meshType",2,1,3));// Changes between standard pointCloud , CubeMap and Texture mode
-    gui.add(dummy.setup("dummy",0.1,-1,1));
+    gui.add(dummy.setup("dummy",0.69,-1,1));
     gui.add(meshResolution.setup("meshResolutionSlider",2,1,16)); //Increase-decrease resolution, use always pair values
     gui.add(displacement.setup("displacement",6,2,8)); // adjust kinect points Z-postion
     gui.add(cubeMapSelector.setup("cubeMapSelector",1,1,4));  // Change cube map images use with meshType = 3
     gui.add(displacementAmount.setup("displacementAmount",0.0,0,0.2));
     gui.add(cameraDistance.setup("cameraDistance",500,100,2000));
     gui.add(fatten.setup("fatten",0,-1,1));
-    gui.add(cameraZoom.setup("cameraZoom",0,25,25)); //Zoom in-out cam.
+    //gui.add(cameraZoom.setup("cameraZoom",0,25,25)); //Zoom in-out cam.
     gui.add(drawLights.setup("drawLights",0,25,25));
     gui.add(activateLightStrobe.setup("activateLightStrobe",0,25,25));
     gui.add(lightStrobeFrequency.setup("lightStrobeFrequency",2,0,3));
@@ -162,7 +162,7 @@ void ofApp::update() {
 void ofApp::calcNormals(ofMesh &mesh) {
     for (int i = 0; i < mesh.getVertices().size(); i++)
         mesh.addNormal(ofPoint(0, 0, 0));
-    
+   
     for (int i = 0; i < mesh.getIndices().size(); i += 3) {
         const int ia = mesh.getIndices()[i];
         const int ib = mesh.getIndices()[i + 1];
@@ -183,10 +183,13 @@ void ofApp::calcNormals(ofMesh &mesh) {
         mesh.getNormals()[ib] += no;
         mesh.getNormals()[ic] += no;
         
+        
         // depending on your clockwise / winding order, you might want to reverse
         // the e2 / e1 above if your normals are flipped.
     }
 }
+
+
 
 
 
@@ -780,22 +783,22 @@ void ofApp::updateKinectMesh(){
                     }
                 }
                 calcNormals(mesh);
-                //                for (int i = 0; i < mesh.getIndices().size(); i++) {
-                //                    const int ia = mesh.getIndices()[i];
-                //                    if (ia < mesh.getVertices().size() ) {
-                //
-                //                        //ofVec3f e1 = mesh.getVertices()[ia];
-                //                        ofVec3f norml = mesh.getNormals()[ia];
-                //                        float hello = sqrt(4);
-                //
-                //                        float l = sqrt(norml[0]*norml[0]+norml[1]*norml[1]+norml[2]*norml[2]);
-                //
-                //                        if (l != 0.0){
-                //                            mesh.getVertices()[ia] = mesh.getVertices()[ia] + (norml*0.9*10.0)/l;
-                //                        }
-                //
-                //                    }
-                //                }
+                                for (int i = 0; i < mesh.getIndices().size(); i++) {
+                                    const int ia = mesh.getIndices()[i];
+                                    if (ia < mesh.getVertices().size() ) {
+                
+                                        //ofVec3f e1 = mesh.getVertices()[ia];
+                                        ofVec3f norml = mesh.getNormals()[ia];
+                                        float hello = sqrt(4);
+                
+                                        float l = sqrt(norml[0]*norml[0]+norml[1]*norml[1]+norml[2]*norml[2]);
+                
+                                        if (l != 0.0){
+                                            mesh.getVertices()[ia] += norml*fatten*3.0/l;
+                                        }
+                
+                                    }
+                                }
             }
         }
         kinectFrameLimiter++;
@@ -959,7 +962,8 @@ void ofApp::updateKinectMesh(){
                     }
                 }
                 
-                
+            
+            
             }
         }
         kinectFrameLimiter++;
@@ -994,9 +998,9 @@ void ofApp::drawPointCloudMode(){
         ofDrawAxis(200);
         ofPushMatrix();
         //ofRotateZ(-180);
-        //ofTranslate(-kinect0.getDepthPixelsRef().getWidth()/2, -kinect0.getDepthPixelsRef().getHeight()/2, +600);
+        ofTranslate(-kinect0.getDepthPixelsRef().getWidth()/2, -kinect0.getDepthPixelsRef().getHeight()/2, +600);
         ofScale(1, -1, -1);
-        ofTranslate(0, 0, -1000);
+        //ofTranslate(0, 0, -1000);
         mesh.draw();
         ofPopMatrix();
         
@@ -1027,10 +1031,11 @@ void ofApp::drawCubeMapMode(){
     cubeMapShader.setUniform1f("reflectivity", 1.0);
     ofPushMatrix();
     //ofRotateZ(-180);
-    sphere.draw();
-    //ofTranslate(-kinect0.getDepthPixelsRef().getWidth()/2, -kinect0.getDepthPixelsRef().getHeight()/2, +600);
+    //sphere.draw();
+
+    ofTranslate(-kinect0.getDepthPixelsRef().getWidth()/2, -kinect0.getDepthPixelsRef().getHeight()/2, +600);
     ofScale(1, -1, -1);
-    ofTranslate(0, 0, -1000);
+//    ofTranslate(0, 0, -1000);
     mesh.drawFaces();
     ofPopMatrix();
     cubeMapShader.end();
@@ -1041,14 +1046,14 @@ void ofApp::drawTexturedMode(){
     
     updateLights();
     strobeLights();
-    //  positionLights();
+     positionLights();
     cam.begin();
     phong.begin();
     ofPushMatrix();
    // ofRotateZ(-180);
-    //ofTranslate(-kinect0.getDepthPixelsRef().getWidth()/2, -kinect0.getDepthPixelsRef().getHeight()/2, +600);
+    ofTranslate(-kinect0.getDepthPixelsRef().getWidth()/2, -kinect0.getDepthPixelsRef().getHeight()/2, +600);
     ofScale(1, -1, -1);
-    ofTranslate(0, 0, -1000);
+   // ofTranslate(0, 0, -1000);
     mesh.drawFaces();
     ofDrawAxis(100);
     ofPopMatrix();
@@ -1324,7 +1329,7 @@ void ofApp:: setupKinect(){
     
     // zero the tilt on startup
     angle = 0;
-    kinect.setCameraTiltAngle(angle);
+   // kinect.setCameraTiltAngle(angle);
     // start from the front
     bDrawPointCloud = false;
 
