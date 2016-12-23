@@ -29,10 +29,10 @@ void ofApp::setup() {
     gui.add(back.setup("backSlider",880,0,8000));
     gui.add(smoothCount.setup("smoothCount",0,1,10));
     gui.add(temporalSmoothing.setup("temporalSmoothing",0.31,0,1));
-    gui.add(pointSize.setup("pointSize",2,0,100));  // Increase-decrease point size use it with meshMode = 1 (GL_POINTS)
+    gui.add(pointSize.setup("pointSize",2,1,4));  // Increase-decrease point size use it with meshMode = 1 (GL_POINTS)
     gui.add(meshMode.setup("meshMode",3,1,4));  // It change mesh mode POINTS, LINES ,TRIANGLES = activates delanuay, LINES_LOOP
     gui.add(meshType.setup("meshType",2,1,3));// Changes between standard pointCloud , CubeMap and Texture mode
-    gui.add(dummy.setup("dummy",0.69,-1,1));
+    gui.add(dummy.setup("dummy",0.05,-1,1));
     gui.add(meshResolution.setup("meshResolutionSlider",2,1,16)); //Increase-decrease resolution, use always pair values
     gui.add(displacement.setup("displacement",6,2,8)); // adjust kinect points Z-postion
     gui.add(cubeMapSelector.setup("cubeMapSelector",1,1,4));  // Change cube map images use with meshType = 3
@@ -44,7 +44,7 @@ void ofApp::setup() {
     gui.add(activateLightStrobe.setup("activateLightStrobe",0,25,25));
     gui.add(lightStrobeFrequency.setup("lightStrobeFrequency",2,0,3));
     gui.add(flashSpeed.setup("flashSpeed",1,1,3));
-    gui.add(cameraSpin.setup("cameraSpin",0,25,25));
+    gui.add(cameraSpin.setup("cameraSpin",25,25,25));
     gui.add(activateParticles.setup("activateParticles",0,25,25)); // test with particles to future simulate delays , Atention! Drops FPS if not set higher values of meshResolution
     gui.add(showSolvers.setup("showSolvers",0,25,25));
     
@@ -200,18 +200,27 @@ void ofApp::changeMeshMode(int &meshSelector){
     switch (meshSelector) {
         case 1:{
             mesh.setMode(OF_PRIMITIVE_POINTS);
+            meshType=1;
         }
             break;
         case 2:{
             mesh.setMode(OF_PRIMITIVE_LINES);
+            meshType=1;
         }
             break;
         case 3:{
             mesh.setMode(OF_PRIMITIVE_TRIANGLES);
+            meshType=2;
         }
             break;
         case 4:{
             mesh.setMode(OF_PRIMITIVE_LINE_LOOP);
+            meshType=1;
+        }
+        case 5:{
+            mesh.setMode(OF_PRIMITIVE_TRIANGLES);
+            meshType=3;
+            activateLightStrobe;
         }
             break;
             
@@ -230,9 +239,12 @@ void ofApp::changeCubeMapImages(int textureSelector, ofxCubeMap &myCubeMap) {
             break;
         case 1:
             myCubeMap.loadImages(
-                                 "ame_bluefreeze/bluefreeze_rt.tga", "ame_bluefreeze/bluefreeze_lf.tga",
-                                 "ame_bluefreeze/bluefreeze_up.tga", "ame_bluefreeze/bluefreeze_dn.tga",
-                                 "ame_bluefreeze/bluefreeze_ft.tga", "ame_bluefreeze/bluefreeze_bk.tga");
+                                 "warehouse/px.jpg",
+                                 "warehouse/nx.jpg",
+                                 "warehouse/py.jpg",
+                                 "warehouse/ny.jpg",
+                                 "warehouse/pz.jpg",
+                                 "warehouse/nz.jpg");
             break;
         case 2:
             myCubeMap.loadImages("mp_ss/ss_rt.tga", "mp_ss/ss_lf.tga",
