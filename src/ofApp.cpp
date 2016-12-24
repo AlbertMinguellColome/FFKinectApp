@@ -621,6 +621,25 @@ void ofApp::updateKinectV1Mesh() {
     
     // Calculate normals
     calcNormals(mesh);
+      
+        
+        //Fatten algorithm
+        for (int i = 0; i < mesh.getIndices().size(); i++) {
+            const int ia = mesh.getIndices()[i];
+            if (ia < mesh.getVertices().size() ) {
+                
+                //ofVec3f e1 = mesh.getVertices()[ia];
+                ofVec3f norml = mesh.getNormals()[ia];
+                float hello = sqrt(4);
+                
+                float l = sqrt(norml[0]*norml[0]+norml[1]*norml[1]+norml[2]*norml[2]);
+                
+                if (l != 0.0){
+                    mesh.getVertices()[ia] = mesh.getVertices()[ia] + (norml*0.9*-3*fatten)/l;
+                }
+                
+            }
+        }
         
     }
 }
@@ -628,8 +647,6 @@ void ofApp::updateKinectV1Mesh() {
 
 void ofApp::updateKinectMesh(){
     kinect0.update();
-
-
     positionLights();
 
     if (!useMultikinect){
