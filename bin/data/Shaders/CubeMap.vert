@@ -2,6 +2,7 @@
 
 varying vec3 reflectVec;
 uniform float displacementAmount;
+uniform vec3 pos_eye;
 
 vec4 displaceFatternFunc( vec4 pos, vec3 norm )
 {
@@ -50,9 +51,10 @@ vec4 displaceVertexFunc( vec4 pos, float phase, float frequency )
 }
 void main()
 {
-    vec3 V = vec3(gl_ModelViewMatrix * gl_Vertex);
+    float ratio = 1.0 /1.9;
+    vec3 V = vec3(gl_ModelViewMatrix * gl_Vertex) - pos_eye;
     vec3 N = normalize(gl_NormalMatrix * gl_Normal);
-    reflectVec = reflect(normalize(-V), N);
+    reflectVec = refract(normalize(V), N, ratio);
     
     vec4 displacedPosition;
     displacedPosition = displaceVertexFunc(gl_Vertex, 2.0, 50 );

@@ -1084,17 +1084,21 @@ void ofApp::drawCubeMapMode(){
     myCubeMap.bind();
     cubeMapShader.begin();
     cubeMapShader.setUniform1i("envMap", 0);
-    cubeMapShader.setUniform1f("reflectivity", 1.0);
+    cubeMapShader.setUniform1f("reflectivity", 1);
+    cubeMapShader.setUniform3f("pos_eye", cam.getPosition());
     ofPushMatrix();
     //ofRotateZ(-180);
     sphere.draw();
+    
     //ofTranslate(-kinect0.getDepthPixelsRef().getWidth()/2, -kinect0.getDepthPixelsRef().getHeight()/2, +600);
     ofScale(1, -1, -1);
     ofTranslate(0, 0, -1000);
     mesh.drawFaces();
     ofPopMatrix();
     cubeMapShader.end();
+    myCubeMap.drawSkybox(2000);
     myCubeMap.unbind();
+   
     cam.end();
 };
 void ofApp::drawTexturedMode(){
