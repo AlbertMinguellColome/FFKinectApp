@@ -12,6 +12,10 @@
 #include "SettingsManager.h"
 #include "ofxKinect.h"
 #include "ofxOpenCv.h"
+#include "concurrency.h"
+#include <iostream>
+#include <queue>
+#include <string>
 
 enum meshType
 {
@@ -26,13 +30,17 @@ public:
     
     
     ofxCvColorImage colorImg;
-    ofFloatImage depthFloat;
+    ofxCvShortImage depth;
+    
     
     ofxCvGrayscaleImage grayImage; // grayscale depth image
     ofxCvGrayscaleImage grayThreshNear; // the near thresholded image
     ofxCvGrayscaleImage grayThreshFar;
-    
+    parallelise paralleliseManager;
     ofShortPixels kinectDepth;
+    ofShortPixels  kinectSmoothDepth;
+    queue <ofShortPixels> depthQueue;
+    
 
     ofLight pointLight;
     ofLight directionalLight;
@@ -94,6 +102,8 @@ public:
     ofxPanel gui;
     ofxIntSlider  front;
     ofxFloatSlider  dummy;
+    ofxIntSlider  innerThreshold;
+    ofxIntSlider  outerThreshold;
     ofxIntSlider  back;
     ofxIntSlider  pointSize;
     ofxIntSlider  meshMode;
@@ -109,6 +119,7 @@ public:
     ofxFloatSlider ZFilterMesh;
     ofxFloatSlider fatten;
     ofxToggle showSolvers;
+    ofxToggle activateSmooth;
     ofxToggle cameraZoom;
     ofxToggle cameraSpin;
     ofxToggle showSolver;
@@ -153,6 +164,12 @@ public:
     void dragEvent(ofDragInfo dragInfo);
     void gotMessage(ofMessage msg);
     
+    
+    // Mesh smooth
+    void CheckForDequeue();
+    void depthFilter ();
+    void processAverageDepth(ofShortPixels & kinectDepth);
+    void processDepth(int depthArrayRowIndex);
     //Calculates mesh normals
     void calcNormals(ofMesh &mesh);
     //Draws panel with all parameters

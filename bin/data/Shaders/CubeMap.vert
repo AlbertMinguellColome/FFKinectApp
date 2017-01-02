@@ -54,8 +54,8 @@ void main()
     float ratio = 1.0 /1.9;
     vec3 V = vec3(gl_ModelViewMatrix * gl_Vertex) - pos_eye;
     vec3 N = normalize(gl_NormalMatrix * gl_Normal);
-    reflectVec = refract(normalize(V), N, ratio);
-    
+    //reflectVec = refract(normalize(V), N, ratio);
+    reflectVec = -reflect(normalize(-V), -N);
     vec4 displacedPosition;
     displacedPosition = displaceVertexFunc(gl_Vertex, 2.0, 50 );
   //  gl_Position = gl_ModelViewProjectionMatrix * displacedPosition;//gl_Vertex;

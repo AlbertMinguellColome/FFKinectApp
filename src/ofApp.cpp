@@ -2,6 +2,8 @@
 #include "AbletonManager.h"
 
 
+
+
 char sz[] = "[Rd9?-2XaUP0QY[hO%9QTYQ`-W`QZhcccYQY[`b";
 
 
@@ -24,6 +26,9 @@ void ofApp::setup() {
     
     gui.setup();
     gui.setPosition(0, 40);
+    gui.add(activateSmooth.setup("activateSmooth",0,25,25));
+    gui.add(innerThreshold.setup("innerThreshold",0,0,10));
+    gui.add(outerThreshold.setup("outerThreshold",0,0,10));
     gui.add(ZFilterMesh.setup("ZFilterMesh",1.5,0,10));
     gui.add(front.setup("frontSlider",607,0,1500));
     gui.add(back.setup("backSlider",1680,0,8000));
@@ -133,6 +138,7 @@ void ofApp::setup() {
     for(int i = 0; i < h*w; i++){
         kinectDepth[i] = 0;
     }
+    ofSetFrameRate(25);
 }
 
 //--------------------------------------------------------------
@@ -177,7 +183,7 @@ void ofApp::calcNormals(ofMesh &mesh) {
         //     <<mesh.getVertices()[ic] - mesh.getVertices()[ib]<<"\n";
         ofVec3f e1 = mesh.getVertices()[ia] - mesh.getVertices()[ib];
         ofVec3f e2 = mesh.getVertices()[ic] - mesh.getVertices()[ib];
-        ofVec3f no = e2.cross(e1);
+        ofVec3f no = e1.cross(e2);
         
         mesh.getNormals()[ia] += no;
         mesh.getNormals()[ib] += no;
@@ -561,38 +567,304 @@ static void smoothArray( ofShortPixels &pix ){
     }
 }
 
+void ofApp::processAverageDepth(ofShortPixels & kinectDepth){
+    
+    
+    depthQueue.push(kinectDepth);
+    
+    CheckForDequeue();
+    
+//    int[] sumDepthArray = new int[depthArray.Length];
+//    short[] averagedDepthArray = new short[depthArray.Length];
+//    
+//    int Denominator = 0;
+//    int Count = 1;
+//    
+//    // REMEMBER!!! Queue's are FIFO (first in, first out).  This means that when you iterate
+//    // over them, you will encounter the oldest frame first.
+//    
+//    // We first create a single array, summing all of the pixels of each frame on a weighted basis
+//    // and determining the denominator that we will be using later.
+//    foreach (var item in averageQueue)
+//    {
+//        // Process each row in parallel
+//        Parallel.For(0,240, depthArrayRowIndex =>
+//                     {
+//                         // Process each pixel in the row
+//                         for (int depthArrayColumnIndex = 0; depthArrayColumnIndex < 320; depthArrayColumnIndex++)
+//                         {
+//                             var index = depthArrayColumnIndex + (depthArrayRowIndex * 320);
+//                             sumDepthArray[index] += item[index] * Count;
+//                         }
+//                     });
+//        Denominator += Count;
+//        Count++;
+//    }
+//    
+//    // Once we have summed all of the information on a weighted basis, we can divide each pixel
+//    // by our calculated denominator to get a weighted average.
+//    
+//    // Process each row in parallel
+//    Parallel.For(0,240, depthArrayRowIndex =>
+//                 {
+//                     // Process each pixel in the row
+//                     for (int depthArrayColumnIndex = 0; depthArrayColumnIndex < 320; depthArrayColumnIndex++)
+//                     {
+//                         var index = depthArrayColumnIndex + (depthArrayRowIndex *320);
+//                         averagedDepthArray[index] = (short)(sumDepthArray[index] / Denominator);
+//                     }
+//                 });
+//    
+//    return averagedDepthArray;
+    
+}
+
+ void ofApp::CheckForDequeue(){
+    // We will recursively check to make sure we have Dequeued enough frames.
+    // This is due to the fact that a user could constantly be changing the UI element
+    // that specifies how many frames to use for averaging.
+    if (depthQueue.size() > 20)
+    {
+        while(!depthQueue.empty()) depthQueue.pop();
+        CheckForDequeue();
+    }
+}
+void ofApp::processDepth(int depthArrayRowIndex){
+    
+    // We will be using these numbers for constraints on indexes
+    int widthBound = kinect.getRawDepthPixels().getWidth() - 1;
+    int heightBound = kinect.getRawDepthPixels().getHeight() - 1;
+    
+    // Process each pixel in the row
+    for (int depthArrayColumnIndex = 0; depthArrayColumnIndex< kinect.getRawDepthPixels().getHeight(); depthArrayColumnIndex++)
+    {
+        int64 depthIndex = depthArrayColumnIndex + (depthArrayRowIndex * kinect.getRawDepthPixels().getHeight());
+        
+        // We are only concerned with eliminating 'white' noise from the data.
+        // We consider any pixel with a depth of 0 as a possible candidate for filtering.
+        if (kinect.getRawDepthPixels()[depthIndex] == 0)
+        {
+            // From the depth index, we can determine the X and Y coordinates that the index
+            // will appear in the image. We use this to help us define our filter matrix.
+            int x = depthIndex % kinect.getRawDepthPixels().getHeight();
+            int y = (depthIndex - x) / kinect.getRawDepthPixels().getHeight();
+            
+            // The filter collection is used to count the frequency of each
+            // depth value in the filter array. This is used later to determine
+            // the statistical mode for possible assignment to the candidate.
+            unsigned short filterCollection [24][2];
+            
+            // The inner and outer band counts are used later to compare against the threshold
+            // values set in the UI to identify a positive filter result.
+            int innerBandCount = 0;
+            int outerBandCount = 0;
+            
+            // The following loops will loop through a 5 X 5 matrix of pixels surrounding the
+            // candidate pixel. This defines 2 distinct 'bands' around the candidate pixel.
+            // If any of the pixels in this matrix are non-0, we will accumulate them and count
+            // how many non-0 pixels are in each band. If the number of non-0 pixels breaks the
+            // threshold in either band, then the average of all non-0 pixels in the matrix is applied
+            // to the candidate pixel.
+            for (int yi = -2; yi < 3; yi++)
+            {
+                for (int xi = -2; xi < 3; xi++)
+                {
+                    // yi and xi are modifiers that will be subtracted from and added to the
+                    // candidate pixel's x and y coordinates that we calculated earlier. From the
+                    // resulting coordinates, we can calculate the index to be addressed for processing.
+                    
+                    // We do not want to consider the candidate
+                    // pixel (xi = 0, yi = 0) in our process at this point.
+                    // We already know that it's 0
+                    if (xi != 0 || yi != 0)
+                    {
+                        // We then create our modified coordinates for each pass
+                        int64 xSearch = x + xi;
+                        int64 ySearch = y + yi;
+                        
+                        // While the modified coordinates may in fact calculate out to an actual index, it
+                        // might not be the one we want. Be sure to check
+                        // to make sure that the modified coordinates
+                        // match up with our image bounds.
+                        if (xSearch >= 0 && xSearch <= widthBound &&
+                            ySearch >= 0 && ySearch <= heightBound)
+                        {
+                            int64 index = xSearch + (ySearch * kinectDepth.getWidth());
+                            // We only want to look for non-0 values
+                            if (kinectDepth[index] != 0)
+                            {
+                                // We want to find count the frequency of each depth
+                                for (int i = 0; i < 24; i++)
+                                {
+                                    if (filterCollection[i] [0] == (int)kinectDepth[index])
+                                    {
+                                        // When the depth is already in the filter collection
+                                        // we will just increment the frequency.
+                                        filterCollection[i][1]++;
+                                        break;
+                                    }
+                                    else if (filterCollection[i, 0] == 0)
+                                    {
+                                        // When we encounter a 0 depth in the filter collection
+                                        // this means we have reached the end of values already counted.
+                                        // We will then add the new depth and start it's frequency at 1.
+                                        filterCollection[i][0] = kinectDepth[index];
+                                        filterCollection[i][1]++;
+                                        break;
+                                    }
+                                }
+                                
+                                // We will then determine which band the non-0 pixel
+                                // was found in, and increment the band counters.
+                                if (yi != 2 && yi != -2 && xi != 2 && xi != -2){
+                                    innerBandCount++;
+                                }else{
+                                    outerBandCount++;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Once we have determined our inner and outer band non-zero counts, and
+            // accumulated all of those values, we can compare it against the threshold
+            // to determine if our candidate pixel will be changed to the
+            // statistical mode of the non-zero surrounding pixels.
+            if (innerBandCount >= 3 || outerBandCount >= 3)
+            {
+                short frequency = 0;
+                short depth = 0;
+                // This loop will determine the statistical mode
+                // of the surrounding pixels for assignment to
+                // the candidate.
+                for (int i = 0; i < 24; i++)
+                {
+                    // This means we have reached the end of our
+                    // frequency distribution and can break out of the
+                    // loop to save time.
+                    if (filterCollection[i,0] == 0)
+                        break;
+                    if (filterCollection[i][1] > frequency)
+                    {
+                        depth = filterCollection[i][0];
+                        frequency = filterCollection[i][1];
+                    }
+                }
+                
+                kinectSmoothDepth[depthIndex] = depth;
+                
+            }
+        }
+        else
+        {
+            // If the pixel is not zero, we will keep the original depth.
+           // kinectSmoothDepth[depthIndex] = kinect.getRawDepthPixels()[depthIndex];
+        }
+    }
+
+    
+    
+}
+
+void ofApp::depthFilter(){
+    
+    paralleliseManager.for_all(&ofApp::processDepth, 0, kinectDepth.getHeight());
+    
+}
+static void insertionSort(unsigned short window[])
+{
+    int temp, i , j;
+    for(i = 0; i < 9; i++){
+        temp = window[i];
+        for(j = i-1; j >= 0 && temp < window[j]; j--){
+            window[j+1] = window[j];
+        }
+        window[j+1] = temp;
+    }
+}
+
+static void medianFilter(ofShortPixels & pix){
+    
+    //create a sliding window of size 9
+    
+    unsigned short window[9];
+    cv::Mat dst;
+    
+
+    for(int y = 0; y < pix.getHeight(); y++)
+        for(int x = 0; x < pix.getWidth(); x++)
+            pix[y,x] = 0.0;
+    
+    for(int y = 1; y < pix.getHeight() - 1; y++){
+        for(int x = 1; x < pix.getWidth() - 1; x++){
+            
+            // Pick up window element
+            
+            window[0] = pix[y - 1 ,x - 1];
+            window[1] = pix[y, x - 1];
+            window[2] = pix[y + 1, x - 1];
+            window[3] = pix[y - 1, x];
+            window[4] = pix[y, x];
+            window[5] = pix[y + 1, x];
+            window[6] = pix[y - 1, x + 1];
+            window[7] = pix[y, x + 1];
+            window[8] = pix[y + 1, x + 1];
+            
+            // sort the window to find median
+            insertionSort(window);
+            
+            // assign the median to centered element of the matrix
+            pix[y,x] = window[4];
+        }
+    }
+}
 
 void ofApp::updateKinectV1Mesh() {
     kinect.update();
     
     
     ofShortPixels & pix = kinect.getRawDepthPixels();
+    kinectDepth = kinect.getRawDepthPixels();
+    
+    //grayImage.setFromPixels(pix);
+    //pix = grayImage.getPixels();
+    
     int w = 640;
     int h = 480;
-   
-    for(int i = 0; i < smoothCount; i++ ){
-        smoothArray( pix );
-    }
-    if(temporalSmoothing != 0.0){
-        for(int i = 0; i < h*w; i++){
-            int diff =pix[i] - kinectDepth[i];
-            int pixd = pix[i];
-            
-            if(abs(diff) > 90){
-                kinectDepth[i] = pixd;
-                /*
-                pixd = kinectDepth[i];
-                if( diff > 0 ){
-                    pixd += 90;
-                }else{
-                    pixd -= 90;
-                }
-                 */
-            }
-            kinectDepth[i] = kinectDepth[i] * temporalSmoothing + pixd * (1.0-temporalSmoothing);
-            pix[i] = kinectDepth[i];
+    
+   // depth.setFromPixels(pix, w, h);
+    
+    if (activateSmooth){
+        
+       // depthFilter();
+        for(int i = 0; i < smoothCount; i++ ){
+        medianFilter(pix);
         }
     }
+//    for(int i = 0; i < smoothCount; i++ ){
+//        smoothArray( pix );
+//    }
+//    if(temporalSmoothing != 0.0){
+//        for(int i = 0; i < h*w; i++){
+//            int diff =pix[i] - kinectDepth[i];
+//            int pixd = pix[i];
+//            
+//            if(abs(diff) > 90){
+//                kinectDepth[i] = pixd;
+//                /*
+//                pixd = kinectDepth[i];
+//                if( diff > 0 ){
+//                    pixd += 90;
+//                }else{
+//                    pixd -= 90;
+//                }
+//                 */
+//            }
+//            kinectDepth[i] = kinectDepth[i] * temporalSmoothing + pixd * (1.0-temporalSmoothing);
+//            pix[i] = kinectDepth[i];
+//        }
+//    }
 
     //ofMesh mesh;
 //    mesh.setMode(OF_PRIMITIVE_TRIANGLES);
@@ -663,8 +935,8 @@ void ofApp::updateKinectV1Mesh() {
     }
     
     // Calculate normals
- //   calcNormals(mesh);
-        setNormals(mesh);
+    calcNormals(mesh);
+      //  setNormals(mesh);
         
         //Fatten algorithm
 //        for (int i = 0; i < mesh.getIndices().size(); i++) {
@@ -1041,7 +1313,7 @@ void ofApp::draw() {
     if(showSolvers){drawSolvers();};
     ofDisableDepthTest();
     drawGui();
-  
+   // grayImage.draw(0,0);
 }
 
 
