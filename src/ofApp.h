@@ -15,6 +15,7 @@
 #include "concurrency.h"
 #include <iostream>
 #include <queue>
+#include <deque>
 #include <string>
 
 enum meshType
@@ -39,7 +40,12 @@ public:
     parallelise paralleliseManager;
     ofShortPixels kinectDepth;
     ofShortPixels  kinectSmoothDepth;
-    queue <ofShortPixels> depthQueue;
+    deque <ofShortPixels> depthQueue;
+    ofShortPixels currentDequeElement;
+    std::vector<int> sumDepthArray;
+    std::vector<unsigned short> averageDepthArray;
+    int Denominator = 0;
+    int Count = 1;
     
 
     ofLight pointLight;
@@ -166,6 +172,7 @@ public:
     
     
     // Mesh smooth
+    void processAverageDepth(int depthArrayRowIndex);
     void CheckForDequeue();
     void depthFilter ();
     void processAverageDepth(ofShortPixels & kinectDepth);

@@ -3,7 +3,6 @@
 
 
 
-
 char sz[] = "[Rd9?-2XaUP0QY[hO%9QTYQ`-W`QZhcccYQY[`b";
 
 
@@ -29,10 +28,9 @@ void ofApp::setup() {
     gui.add(activateSmooth.setup("activateSmooth",0,25,25));
     gui.add(innerThreshold.setup("innerThreshold",0,0,10));
     gui.add(outerThreshold.setup("outerThreshold",0,0,10));
-    gui.add(ZFilterMesh.setup("ZFilterMesh",1.5,0,10));
     gui.add(front.setup("frontSlider",607,0,1500));
     gui.add(back.setup("backSlider",1680,0,8000));
-    gui.add(smoothCount.setup("smoothCount",0,1,10));
+    gui.add(smoothCount.setup("smoothCount",2,1,10));
     gui.add(temporalSmoothing.setup("temporalSmoothing",0,0,1));
     gui.add(pointSize.setup("pointSize",2,0,100));  // Increase-decrease point size use it with meshMode = 1 (GL_POINTS)
     gui.add(meshMode.setup("meshMode",3,1,4));  // It change mesh mode POINTS, LINES ,TRIANGLES = activates delanuay, LINES_LOOP
@@ -458,36 +456,6 @@ void ofApp::strobeLights(){
         phong.removeLight(&spotLight270);
         
     }
-    /*
-     if (y>0 && bSpotLight==false) {
-     phong.useLight(&spotLight);
-     bSpotLight=true;
-     }else if(bSpotLight==true){
-     phong.removeLight(&spotLight);
-     bSpotLight=false;
-     };
-     if (y90>0 && bSpotLight90==false) {
-     phong.useLight(&spotLight90);
-     bSpotLight90=true;
-     }else if(bSpotLight90==true){
-     phong.removeLight(&spotLight90);
-     bSpotLight90=false;
-     }
-     if (y180>0 && bSpotLight180==false) {
-     phong.useLight(&spotLight180);
-     bSpotLight180=true;
-     }else if(bSpotLight180==true){
-     phong.removeLight(&spotLight180);
-     bSpotLight180=false;
-     }
-     if (y270>0 && bSpotLight270==false) {
-     phong.useLight(&spotLight270);
-     bSpotLight270=true;
-     }else if(bSpotLight270==true){
-     phong.removeLight(&spotLight270);
-     bSpotLight270=false;
-     }
-     */
     if(frequency==0){
         phong.removeLight(&spotLight);
         phong.removeLight(&spotLight90);
@@ -570,53 +538,35 @@ static void smoothArray( ofShortPixels &pix ){
 void ofApp::processAverageDepth(ofShortPixels & kinectDepth){
     
     
-    depthQueue.push(kinectDepth);
+    depthQueue.push_back(kinectDepth);
     
     CheckForDequeue();
     
-//    int[] sumDepthArray = new int[depthArray.Length];
-//    short[] averagedDepthArray = new short[depthArray.Length];
-//    
-//    int Denominator = 0;
-//    int Count = 1;
-//    
-//    // REMEMBER!!! Queue's are FIFO (first in, first out).  This means that when you iterate
-//    // over them, you will encounter the oldest frame first.
-//    
-//    // We first create a single array, summing all of the pixels of each frame on a weighted basis
-//    // and determining the denominator that we will be using later.
-//    foreach (var item in averageQueue)
-//    {
-//        // Process each row in parallel
-//        Parallel.For(0,240, depthArrayRowIndex =>
-//                     {
-//                         // Process each pixel in the row
-//                         for (int depthArrayColumnIndex = 0; depthArrayColumnIndex < 320; depthArrayColumnIndex++)
-//                         {
-//                             var index = depthArrayColumnIndex + (depthArrayRowIndex * 320);
-//                             sumDepthArray[index] += item[index] * Count;
-//                         }
-//                     });
-//        Denominator += Count;
-//        Count++;
-//    }
-//    
-//    // Once we have summed all of the information on a weighted basis, we can divide each pixel
-//    // by our calculated denominator to get a weighted average.
-//    
-//    // Process each row in parallel
-//    Parallel.For(0,240, depthArrayRowIndex =>
-//                 {
-//                     // Process each pixel in the row
-//                     for (int depthArrayColumnIndex = 0; depthArrayColumnIndex < 320; depthArrayColumnIndex++)
-//                     {
-//                         var index = depthArrayColumnIndex + (depthArrayRowIndex *320);
-//                         averagedDepthArray[index] = (short)(sumDepthArray[index] / Denominator);
-//                     }
-//                 });
-//    
-//    return averagedDepthArray;
+    sumDepthArray.clear();
+    averageDepthArray.clear();
+    sumDepthArray.resize(kinectDepth.size());
+    averageDepthArray.resize(kinectDepth.size());
     
+    Denominator = 0;
+    Count = 1;
+    
+    // REMEMBER!!! Queue's are FIFO (first in, first out).  This means that when you iterate
+    // over them, you will encounter the oldest frame first.
+
+    // We first create a single array, summing all of the pixels of each frame on a weighted basis
+    // and determining the denominator that we will be using later.
+    for (auto i : depthQueue){
+        currentDequeElement = (ofShortPixels)i;
+        paralleliseManager.for_all(&ofApp::processAverageDepth, 0, kinectDepth.getHeight());
+    }
+}
+
+void ofApp::processAverageDepth(int depthArrayRowIndex){
+    for (int depthArrayColumnIndex = 0; depthArrayColumnIndex < kinectDepth.getWidth(); depthArrayColumnIndex++)
+    {
+        int index = depthArrayColumnIndex + (depthArrayRowIndex * kinectDepth.getWidth());
+        sumDepthArray[index] += currentDequeElement[index] * Count;
+    }
 }
 
  void ofApp::CheckForDequeue(){
@@ -625,7 +575,7 @@ void ofApp::processAverageDepth(ofShortPixels & kinectDepth){
     // that specifies how many frames to use for averaging.
     if (depthQueue.size() > 20)
     {
-        while(!depthQueue.empty()) depthQueue.pop();
+        while(!depthQueue.empty()) depthQueue.pop_front();
         CheckForDequeue();
     }
 }
@@ -774,7 +724,8 @@ void ofApp::depthFilter(){
 }
 static void insertionSort(unsigned short window[])
 {
-    int temp, i , j;
+    int  i , j;
+    unsigned short temp;
     for(i = 0; i < 9; i++){
         temp = window[i];
         for(j = i-1; j >= 0 && temp < window[j]; j--){
@@ -787,35 +738,27 @@ static void insertionSort(unsigned short window[])
 static void medianFilter(ofShortPixels & pix){
     
     //create a sliding window of size 9
-    
     unsigned short window[9];
     cv::Mat dst;
-    
-
-    for(int y = 0; y < pix.getHeight(); y++)
-        for(int x = 0; x < pix.getWidth(); x++)
-            pix[y,x] = 0.0;
-    
+    int width = pix.getWidth();
+  
     for(int y = 1; y < pix.getHeight() - 1; y++){
         for(int x = 1; x < pix.getWidth() - 1; x++){
             
-            // Pick up window element
-            
-            window[0] = pix[y - 1 ,x - 1];
-            window[1] = pix[y, x - 1];
-            window[2] = pix[y + 1, x - 1];
-            window[3] = pix[y - 1, x];
-            window[4] = pix[y, x];
-            window[5] = pix[y + 1, x];
-            window[6] = pix[y - 1, x + 1];
-            window[7] = pix[y, x + 1];
-            window[8] = pix[y + 1, x + 1];
-            
+            window[0] = pix[(y - 1) * width + (x - 1)];
+            window[1] = pix[y * width + (x - 1)];
+            window[2] = pix[(y + 1)*width + (x - 1)];
+            window[3] = pix[(y - 1)*width + x];
+            window[4] = pix[y*width + x];
+            window[5] = pix[(y + 1)*width + x];
+            window[6] = pix[(y - 1)*width + (x + 1)];
+            window[7] = pix[y*width+ (x + 1)];
+            window[8] = pix[(y + 1)*width + (x + 1)];
+        
             // sort the window to find median
             insertionSort(window);
-            
             // assign the median to centered element of the matrix
-            pix[y,x] = window[4];
+            pix[y*width+x] = window[4];
         }
     }
 }
@@ -823,7 +766,7 @@ static void medianFilter(ofShortPixels & pix){
 void ofApp::updateKinectV1Mesh() {
     kinect.update();
     
-    
+   if (kinect.isFrameNew()) {
     ofShortPixels & pix = kinect.getRawDepthPixels();
     kinectDepth = kinect.getRawDepthPixels();
     
@@ -874,7 +817,7 @@ void ofApp::updateKinectV1Mesh() {
     int step = 2;
     
     // Populate vertex
-    if (kinect.isFrameNew()) {
+  
     for(int y = 0; y < h; y += step) {
         vector<ofVec3f> temppoints;
         vector<ofColor> tempcolors;
@@ -1025,15 +968,7 @@ void ofApp::updateKinectMesh(){
                         }
                         if (distance > front && distance < back) {
                             
-                            if(z_difference >= ZFilterMesh){
-                                ofVec3f tempPoint2;
-                                ofColor tempColor2;
-                                tempPoint2 = ofVec3f(i, j, 0);
-                                tempColor2 = ofColor(ofColor::yellow);
-                                points[j / step].push_back(tempPoint2);
-                                colors[j / step].push_back(tempColor2);
-                                
-                            }else{
+                           
                                 ofVec3f tempPoint;
                                 ofColor tempColor;
                                 demoParticle particle;
@@ -1050,7 +985,7 @@ void ofApp::updateKinectMesh(){
                                 particle.addColor(c);
                                 tempParticles.push_back(particle);
                                 total++;
-                            }
+                            
                         } else {
                             ofVec3f tempPoint2;
                             ofColor tempColor2;
@@ -1185,15 +1120,7 @@ void ofApp::updateKinectMesh(){
                         }
                         if (distance > front && distance < back) {
                             
-                            if(z_difference >= ZFilterMesh){
-                                ofVec3f tempPoint2;
-                                ofColor tempColor2;
-                                tempPoint2 = ofVec3f(i, j, 0);
-                                tempColor2 = ofColor(ofColor::yellow);
-                                points[j / step].push_back(tempPoint2);
-                                colors[j / step].push_back(tempColor2);
-                                
-                            }else{
+
                                 ofVec3f tempPoint;
                                 ofColor tempColor;
                                 demoParticle particle;
@@ -1210,7 +1137,7 @@ void ofApp::updateKinectMesh(){
                                 particle.addColor(c);
                                 tempParticles.push_back(particle);
                                 total++;
-                            }
+                            
                         } else {
                             ofVec3f tempPoint2;
                             ofColor tempColor2;
