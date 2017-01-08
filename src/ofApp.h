@@ -13,10 +13,12 @@
 #include "ofxKinect.h"
 #include "ofxOpenCv.h"
 #include "concurrency.h"
+#include "ofxKinectDepthUtils.h"
 #include <iostream>
 #include <queue>
 #include <deque>
 #include <string>
+
 
 enum meshType
 {
@@ -25,7 +27,7 @@ enum meshType
     texturedMesh=3
 };
 
-class ofApp : public ofBaseApp{
+class ofApp : public ofBaseApp,ofThread{
     
 public:
     
@@ -90,6 +92,7 @@ public:
     ofImage tex;
     ofxMultiKinectV2 kinect0;
     ofxKinect kinect;
+    ofxKinectDepthUtils  kinectUtils;
     ofVboMesh mesh;
     enum meshType meshtype;
     
@@ -109,6 +112,7 @@ public:
     ofxIntSlider  front;
     ofxFloatSlider  dummy;
     ofxIntSlider  innerThreshold;
+    ofxIntSlider  frameRate;
     ofxIntSlider  outerThreshold;
     ofxIntSlider  back;
     ofxIntSlider  pointSize;
@@ -135,6 +139,18 @@ public:
     ofxToggle activateLightStrobe;
     ofxIntSlider  cubeMapSelector;
     ofxFloatSlider temporalSmoothing;
+    
+    
+    ofxToggle isDepthSmoothingActive;
+    ofxToggle isSmoothingThresholdOnly;
+    ofxToggle isNormalMapThresholdOnly;
+    ofxFloatSlider nearThreshold;
+    ofxFloatSlider farThreshold;
+    ofxFloatSlider meshBlurRadius;
+    ofxFloatSlider zAveragingMaxDepth;
+    ofxFloatSlider blankDepthPixMax;
+    
+    
     
     //Solver
     float                   colorMult;
@@ -172,15 +188,26 @@ public:
     
     
     // Mesh smooth
+    void setDepthSmoothingActive(bool &val);
+    void setNearThreshold(float &val);
+    void setFarThreshold(float &val);
+    void setMeshBlurRadius(float &val);
+    void setZAveragingMaxDepth(float &val);
+    void setBlankDepthPixMax(float &val);
+    void setSmoothingThresholdOnly(bool &val);
+    void setNormalMapThresholdOnly(bool &val);
+
     void processAverageDepth(int depthArrayRowIndex);
     void CheckForDequeue();
-    void depthFilter ();
+    void depthFilter (ofShortPixels & pix);
     void processAverageDepth(ofShortPixels & kinectDepth);
     void processDepth(int depthArrayRowIndex);
+    void smoothArray(int process,ofShortPixels &pix);
     //Calculates mesh normals
     void calcNormals(ofMesh &mesh);
     //Draws panel with all parameters
     void drawGui();
+    void setupGui();
     //Draws pointCloud
     void drawPointCloudMode();
     //Draws cubeMap
@@ -226,8 +253,6 @@ public:
     void drawSolvers();
     
     //Kinect 1
-    int nearThreshold;
-    int farThreshold;
     int angle;
     bool bThreshWithOpenCV;
     bool bDrawPointCloud;

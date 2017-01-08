@@ -1,5 +1,6 @@
 #include "ofApp.h"
 #include "AbletonManager.h"
+#include "ofxOpenCv.h"
 
 
 
@@ -23,38 +24,7 @@ void setupAbleton(){
 
 void ofApp::setup() {
     
-    gui.setup();
-    gui.setPosition(0, 40);
-    gui.add(activateSmooth.setup("activateSmooth",0,25,25));
-    gui.add(innerThreshold.setup("innerThreshold",0,0,10));
-    gui.add(outerThreshold.setup("outerThreshold",0,0,10));
-    gui.add(front.setup("frontSlider",607,0,1500));
-    gui.add(back.setup("backSlider",1680,0,8000));
-    gui.add(smoothCount.setup("smoothCount",2,1,10));
-    gui.add(temporalSmoothing.setup("temporalSmoothing",0,0,1));
-    gui.add(pointSize.setup("pointSize",2,0,100));  // Increase-decrease point size use it with meshMode = 1 (GL_POINTS)
-    gui.add(meshMode.setup("meshMode",3,1,4));  // It change mesh mode POINTS, LINES ,TRIANGLES = activates delanuay, LINES_LOOP
-    gui.add(meshType.setup("meshType",2,1,3));// Changes between standard pointCloud , CubeMap and Texture mode
-    gui.add(dummy.setup("dummy",0.1,-1,1));
-    gui.add(meshResolution.setup("meshResolutionSlider",2,1,16)); //Increase-decrease resolution, use always pair values
-    gui.add(displacement.setup("displacement",6,2,8)); // adjust kinect points Z-postion
-    gui.add(cubeMapSelector.setup("cubeMapSelector",1,1,4));  // Change cube map images use with meshType = 3
-    gui.add(displacementAmount.setup("displacementAmount",0.0,0,0.2));
-    gui.add(cameraDistance.setup("cameraDistance",500,100,2000));
-    gui.add(fatten.setup("fatten",0,-1,1));
-    gui.add(cameraZoom.setup("cameraZoom",0,25,25)); //Zoom in-out cam.
-    gui.add(drawLights.setup("drawLights",0,25,25));
-    gui.add(activateLightStrobe.setup("activateLightStrobe",0,25,25));
-    gui.add(lightStrobeFrequency.setup("lightStrobeFrequency",2,0,3));
-    gui.add(flashSpeed.setup("flashSpeed",1,1,3));
-    gui.add(cameraSpin.setup("cameraSpin",0,25,25));
-    gui.add(activateParticles.setup("activateParticles",0,25,25)); // test with particles to future simulate delays , Atention! Drops FPS if not set higher values of meshResolution
-    gui.add(showSolvers.setup("showSolvers",0,25,25));
-    
-    cubeMapSelector.addListener(this, &ofApp::updateCubeMap);
-    meshMode.addListener(this,&ofApp::changeMeshMode);
-    meshType.addListener(this,&ofApp::changeMeshType);
-    
+    setupGui();
     ofSetLogLevel(OF_LOG_VERBOSE);
     // disable vertical Sync is too bad with light sometimes
     ofSetVerticalSync(true);
@@ -123,7 +93,6 @@ void ofApp::setup() {
         // e.g. Intel HD Graphics will be chosen instead of GeForce.
         // To avoid it, specify OpenCL device index manually like following.
         // kinect1.open(true, true, 0, 2); // GeForce on MacBookPro Retina
-        
         kinect0.start();
         kinect0.update();
     }else{
@@ -136,12 +105,88 @@ void ofApp::setup() {
     for(int i = 0; i < h*w; i++){
         kinectDepth[i] = 0;
     }
-    ofSetFrameRate(25);
+
 }
+
+void ofApp::setupGui(){
+    
+    gui.setup();
+    gui.setPosition(0, 40);
+    gui.add(frameRate.setup("frameRate",60,1,60));
+    gui.add(isDepthSmoothingActive.setup("isDepthSmoothingActive",0,25,25));
+    gui.add(isSmoothingThresholdOnly.setup("isSmoothingThresholdOnly",0,25,25));
+    gui.add(isNormalMapThresholdOnly.setup("isNormalMapThresholdOnly",0,25,25));
+    gui.add(nearThreshold.setup("nearThreshold",0.0,0,4000));
+    gui.add(farThreshold.setup("farThreshold",4000,0,4000));
+    gui.add(meshBlurRadius.setup("meshBlurRadius",1,0,10));
+    gui.add(zAveragingMaxDepth.setup("zAveragingMaxDepth",195,0,200));
+    gui.add(blankDepthPixMax.setup("blankDepthPixMax",7,0,10));
+    gui.add(activateSmooth.setup("activateSmooth",0,25,25));
+    gui.add(innerThreshold.setup("innerThreshold",0,0,10));
+    gui.add(outerThreshold.setup("outerThreshold",0,0,10));
+    gui.add(front.setup("frontSlider",607,0,1500));
+    gui.add(back.setup("backSlider",1680,0,8000));
+    gui.add(smoothCount.setup("smoothCount",2,1,10));
+    gui.add(temporalSmoothing.setup("temporalSmoothing",0,0,1));
+    gui.add(pointSize.setup("pointSize",2,0,100));  // Increase-decrease point size use it with meshMode = 1 (GL_POINTS)
+    gui.add(meshMode.setup("meshMode",3,1,4));  // It change mesh mode POINTS, LINES ,TRIANGLES = activates delanuay, LINES_LOOP
+    gui.add(meshType.setup("meshType",2,1,3));// Changes between standard pointCloud , CubeMap and Texture mode
+    gui.add(dummy.setup("dummy",0.1,-1,1));
+    gui.add(meshResolution.setup("meshResolutionSlider",4,1,16)); //Increase-decrease resolution, use always pair values
+    gui.add(displacement.setup("displacement",6,2,8)); // adjust kinect points Z-postion
+    gui.add(cubeMapSelector.setup("cubeMapSelector",1,1,4));  // Change cube map images use with meshType = 3
+    gui.add(displacementAmount.setup("displacementAmount",0.0,0,0.2));
+    gui.add(cameraDistance.setup("cameraDistance",500,100,2000));
+    gui.add(fatten.setup("fatten",0,-1,1));
+    gui.add(cameraZoom.setup("cameraZoom",0,25,25)); //Zoom in-out cam.
+    gui.add(drawLights.setup("drawLights",0,25,25));
+    gui.add(activateLightStrobe.setup("activateLightStrobe",0,25,25));
+    gui.add(lightStrobeFrequency.setup("lightStrobeFrequency",2,0,3));
+    gui.add(flashSpeed.setup("flashSpeed",1,1,3));
+    gui.add(cameraSpin.setup("cameraSpin",0,25,25));
+    gui.add(activateParticles.setup("activateParticles",0,25,25)); // test with particles to future simulate delays , Atention! Drops FPS if not set higher values of meshResolution
+    gui.add(showSolvers.setup("showSolvers",0,25,25));
+    
+    
+    cubeMapSelector.addListener(this, &ofApp::updateCubeMap);
+    meshMode.addListener(this,&ofApp::changeMeshMode);
+    meshType.addListener(this,&ofApp::changeMeshType);
+    isDepthSmoothingActive.addListener(this,&ofApp::setDepthSmoothingActive);
+    nearThreshold.addListener(this,&ofApp::setNearThreshold);
+    farThreshold.addListener(this,&ofApp::setFarThreshold);
+    meshBlurRadius.addListener(this,&ofApp::setMeshBlurRadius);
+    //zAveragingMaxDepth.addListener(this,&ofApp::setDepthSmoothingActive);
+    //  blankDepthPixMax.addListener(this, &ofApp::setBlankDepthPixMax);
+}
+
+void ofApp::setDepthSmoothingActive(bool &val){
+    kinectUtils.setDepthSmoothingActive(val);
+}
+
+void ofApp::setNearThreshold(float &val){
+    kinectUtils.setNearThreshold(val);
+}
+
+void ofApp::setFarThreshold(float &val){
+    kinectUtils.setFarThreshold(val);
+}
+
+void ofApp::setMeshBlurRadius(float &val){
+    kinectUtils.setMeshBlurRadius(val);
+}
+
+void ofApp::setZAveragingMaxDepth(float &val){
+    kinectUtils.setZAveragingMaxDepth(val);
+}
+
+void ofApp::setBlankDepthPixMax(float &val){
+    kinectUtils.setBlankDepthPixMax(val);
+}
+
 
 //--------------------------------------------------------------
 void ofApp::update() {
-    
+    ofSetFrameRate(frameRate);
     if(!cameraZoom){radius=cameraDistance;};
     if(cameraZoom){zoomInOutCamera();};
     if(cameraSpin){spinCamera();};
@@ -235,11 +280,10 @@ static void setNormals( ofMesh &mesh ){
     mesh.addNormals( norm );
 }
 
-
-
 void ofApp::updateCubeMap(int &cubeMapSelector){
     changeCubeMapImages(cubeMapSelector, myCubeMap);
 }
+
 void ofApp::changeMeshMode(int &meshSelector){
     switch (meshSelector) {
         case 1:{
@@ -313,6 +357,7 @@ void ofApp::updateLights(){
     directionalLight.setPosition(-100, 0, meshPosition.z+600);
     directionalLight.setOrientation(ofVec3f(-90, 0, 0));
 }
+
 void ofApp::setupLights(){
     
     
@@ -463,6 +508,7 @@ void ofApp::strobeLights(){
         phong.removeLight(&spotLight270);
     }
 }
+
 void ofApp::zoomInOutCamera(){
     bool upDirection;
     if(radius>=1000){
@@ -495,7 +541,7 @@ void ofApp::updateCamera(){
     cam.setDistance(cameraDistance);
 }
 
-static void smoothArray( ofShortPixels &pix ){
+void ofApp:: smoothArray(int process, ofShortPixels &pix ){
 //    printf("IN SMOOTH!\n");
     int w = 640;
     int h = 480;
@@ -513,7 +559,7 @@ static void smoothArray( ofShortPixels &pix ){
                 for( int ty = y-1; ty <= y+1; ty++){
                     for( int tx = x-1; tx <= x+1; tx++){
                         int index2 = tx + ty*w;
-                        if( abs(pix[index2] - base) < 20 ){
+                        if( abs(pix[index2] - base) < 50 ){
                             total += pix[index2];
                             numAdded++;
                         }
@@ -535,373 +581,143 @@ static void smoothArray( ofShortPixels &pix ){
     }
 }
 
-void ofApp::processAverageDepth(ofShortPixels & kinectDepth){
-    
-    
-    depthQueue.push_back(kinectDepth);
-    
-    CheckForDequeue();
-    
-    sumDepthArray.clear();
-    averageDepthArray.clear();
-    sumDepthArray.resize(kinectDepth.size());
-    averageDepthArray.resize(kinectDepth.size());
-    
-    Denominator = 0;
-    Count = 1;
-    
-    // REMEMBER!!! Queue's are FIFO (first in, first out).  This means that when you iterate
-    // over them, you will encounter the oldest frame first.
-
-    // We first create a single array, summing all of the pixels of each frame on a weighted basis
-    // and determining the denominator that we will be using later.
-    for (auto i : depthQueue){
-        currentDequeElement = (ofShortPixels)i;
-        paralleliseManager.for_all(&ofApp::processAverageDepth, 0, kinectDepth.getHeight());
-    }
-}
-
-void ofApp::processAverageDepth(int depthArrayRowIndex){
-    for (int depthArrayColumnIndex = 0; depthArrayColumnIndex < kinectDepth.getWidth(); depthArrayColumnIndex++)
-    {
-        int index = depthArrayColumnIndex + (depthArrayRowIndex * kinectDepth.getWidth());
-        sumDepthArray[index] += currentDequeElement[index] * Count;
-    }
-}
-
- void ofApp::CheckForDequeue(){
-    // We will recursively check to make sure we have Dequeued enough frames.
-    // This is due to the fact that a user could constantly be changing the UI element
-    // that specifies how many frames to use for averaging.
-    if (depthQueue.size() > 20)
-    {
-        while(!depthQueue.empty()) depthQueue.pop_front();
-        CheckForDequeue();
-    }
-}
-void ofApp::processDepth(int depthArrayRowIndex){
-    
-    // We will be using these numbers for constraints on indexes
-    int widthBound = kinect.getRawDepthPixels().getWidth() - 1;
-    int heightBound = kinect.getRawDepthPixels().getHeight() - 1;
-    
-    // Process each pixel in the row
-    for (int depthArrayColumnIndex = 0; depthArrayColumnIndex< kinect.getRawDepthPixels().getHeight(); depthArrayColumnIndex++)
-    {
-        int64 depthIndex = depthArrayColumnIndex + (depthArrayRowIndex * kinect.getRawDepthPixels().getHeight());
-        
-        // We are only concerned with eliminating 'white' noise from the data.
-        // We consider any pixel with a depth of 0 as a possible candidate for filtering.
-        if (kinect.getRawDepthPixels()[depthIndex] == 0)
-        {
-            // From the depth index, we can determine the X and Y coordinates that the index
-            // will appear in the image. We use this to help us define our filter matrix.
-            int x = depthIndex % kinect.getRawDepthPixels().getHeight();
-            int y = (depthIndex - x) / kinect.getRawDepthPixels().getHeight();
-            
-            // The filter collection is used to count the frequency of each
-            // depth value in the filter array. This is used later to determine
-            // the statistical mode for possible assignment to the candidate.
-            unsigned short filterCollection [24][2];
-            
-            // The inner and outer band counts are used later to compare against the threshold
-            // values set in the UI to identify a positive filter result.
-            int innerBandCount = 0;
-            int outerBandCount = 0;
-            
-            // The following loops will loop through a 5 X 5 matrix of pixels surrounding the
-            // candidate pixel. This defines 2 distinct 'bands' around the candidate pixel.
-            // If any of the pixels in this matrix are non-0, we will accumulate them and count
-            // how many non-0 pixels are in each band. If the number of non-0 pixels breaks the
-            // threshold in either band, then the average of all non-0 pixels in the matrix is applied
-            // to the candidate pixel.
-            for (int yi = -2; yi < 3; yi++)
-            {
-                for (int xi = -2; xi < 3; xi++)
-                {
-                    // yi and xi are modifiers that will be subtracted from and added to the
-                    // candidate pixel's x and y coordinates that we calculated earlier. From the
-                    // resulting coordinates, we can calculate the index to be addressed for processing.
-                    
-                    // We do not want to consider the candidate
-                    // pixel (xi = 0, yi = 0) in our process at this point.
-                    // We already know that it's 0
-                    if (xi != 0 || yi != 0)
-                    {
-                        // We then create our modified coordinates for each pass
-                        int64 xSearch = x + xi;
-                        int64 ySearch = y + yi;
-                        
-                        // While the modified coordinates may in fact calculate out to an actual index, it
-                        // might not be the one we want. Be sure to check
-                        // to make sure that the modified coordinates
-                        // match up with our image bounds.
-                        if (xSearch >= 0 && xSearch <= widthBound &&
-                            ySearch >= 0 && ySearch <= heightBound)
-                        {
-                            int64 index = xSearch + (ySearch * kinectDepth.getWidth());
-                            // We only want to look for non-0 values
-                            if (kinectDepth[index] != 0)
-                            {
-                                // We want to find count the frequency of each depth
-                                for (int i = 0; i < 24; i++)
-                                {
-                                    if (filterCollection[i] [0] == (int)kinectDepth[index])
-                                    {
-                                        // When the depth is already in the filter collection
-                                        // we will just increment the frequency.
-                                        filterCollection[i][1]++;
-                                        break;
-                                    }
-                                    else if (filterCollection[i, 0] == 0)
-                                    {
-                                        // When we encounter a 0 depth in the filter collection
-                                        // this means we have reached the end of values already counted.
-                                        // We will then add the new depth and start it's frequency at 1.
-                                        filterCollection[i][0] = kinectDepth[index];
-                                        filterCollection[i][1]++;
-                                        break;
-                                    }
-                                }
-                                
-                                // We will then determine which band the non-0 pixel
-                                // was found in, and increment the band counters.
-                                if (yi != 2 && yi != -2 && xi != 2 && xi != -2){
-                                    innerBandCount++;
-                                }else{
-                                    outerBandCount++;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // Once we have determined our inner and outer band non-zero counts, and
-            // accumulated all of those values, we can compare it against the threshold
-            // to determine if our candidate pixel will be changed to the
-            // statistical mode of the non-zero surrounding pixels.
-            if (innerBandCount >= 3 || outerBandCount >= 3)
-            {
-                short frequency = 0;
-                short depth = 0;
-                // This loop will determine the statistical mode
-                // of the surrounding pixels for assignment to
-                // the candidate.
-                for (int i = 0; i < 24; i++)
-                {
-                    // This means we have reached the end of our
-                    // frequency distribution and can break out of the
-                    // loop to save time.
-                    if (filterCollection[i,0] == 0)
-                        break;
-                    if (filterCollection[i][1] > frequency)
-                    {
-                        depth = filterCollection[i][0];
-                        frequency = filterCollection[i][1];
-                    }
-                }
-                
-                kinectSmoothDepth[depthIndex] = depth;
-                
-            }
-        }
-        else
-        {
-            // If the pixel is not zero, we will keep the original depth.
-           // kinectSmoothDepth[depthIndex] = kinect.getRawDepthPixels()[depthIndex];
-        }
-    }
-
-    
-    
-}
-
-void ofApp::depthFilter(){
-    
-    paralleliseManager.for_all(&ofApp::processDepth, 0, kinectDepth.getHeight());
-    
-}
-static void insertionSort(unsigned short window[])
-{
-    int  i , j;
-    unsigned short temp;
-    for(i = 0; i < 9; i++){
-        temp = window[i];
-        for(j = i-1; j >= 0 && temp < window[j]; j--){
-            window[j+1] = window[j];
-        }
-        window[j+1] = temp;
-    }
-}
-
-static void medianFilter(ofShortPixels & pix){
-    
-    //create a sliding window of size 9
-    unsigned short window[9];
-    cv::Mat dst;
+static void medianFilter(ofShortPixels & pix,int x, int y){
     int width = pix.getWidth();
-  
-    for(int y = 1; y < pix.getHeight() - 1; y++){
-        for(int x = 1; x < pix.getWidth() - 1; x++){
-            
-            window[0] = pix[(y - 1) * width + (x - 1)];
-            window[1] = pix[y * width + (x - 1)];
-            window[2] = pix[(y + 1)*width + (x - 1)];
-            window[3] = pix[(y - 1)*width + x];
-            window[4] = pix[y*width + x];
-            window[5] = pix[(y + 1)*width + x];
-            window[6] = pix[(y - 1)*width + (x + 1)];
-            window[7] = pix[y*width+ (x + 1)];
-            window[8] = pix[(y + 1)*width + (x + 1)];
-        
-            // sort the window to find median
-            insertionSort(window);
+    int matrixH = 5;
+    int matrixV = 5;
+    //create a sliding window of size 9
+    std::vector<unsigned short> window;
+    if (y>=(matrixH-1)/2){
+            int horizontalDisplacement = (matrixH-1)/2;
+            int verticalDisplacement = (matrixV-1)/2;
+            for (int h=-horizontalDisplacement ; h<=horizontalDisplacement;h++){
+                for (int v=-verticalDisplacement; v<=verticalDisplacement; v++ ){
+                    window.push_back(pix[(y+v)*width + x+h]);
+                }
+            }
+            sort(window.begin(),window.end());
+            for (vector<int>::size_type i = 0; i != window.size(); ++i)
             // assign the median to centered element of the matrix
-            pix[y*width+x] = window[4];
-        }
+            pix[y*width+x] = window[(matrixV*matrixH-1)/2];
+            window.clear();
     }
 }
 
 void ofApp::updateKinectV1Mesh() {
     kinect.update();
     
-   if (kinect.isFrameNew()) {
-    ofShortPixels & pix = kinect.getRawDepthPixels();
-    kinectDepth = kinect.getRawDepthPixels();
-    
-    //grayImage.setFromPixels(pix);
-    //pix = grayImage.getPixels();
-    
-    int w = 640;
-    int h = 480;
-    
-   // depth.setFromPixels(pix, w, h);
-    
-    if (activateSmooth){
+    if (kinect.isFrameNew()) {
         
-       // depthFilter();
-        for(int i = 0; i < smoothCount; i++ ){
-        medianFilter(pix);
-        }
-    }
-//    for(int i = 0; i < smoothCount; i++ ){
-//        smoothArray( pix );
-//    }
-//    if(temporalSmoothing != 0.0){
-//        for(int i = 0; i < h*w; i++){
-//            int diff =pix[i] - kinectDepth[i];
-//            int pixd = pix[i];
-//            
-//            if(abs(diff) > 90){
-//                kinectDepth[i] = pixd;
-//                /*
-//                pixd = kinectDepth[i];
-//                if( diff > 0 ){
-//                    pixd += 90;
-//                }else{
-//                    pixd -= 90;
-//                }
-//                 */
-//            }
-//            kinectDepth[i] = kinectDepth[i] * temporalSmoothing + pixd * (1.0-temporalSmoothing);
-//            pix[i] = kinectDepth[i];
-//        }
-//    }
-
-    //ofMesh mesh;
-//    mesh.setMode(OF_PRIMITIVE_TRIANGLES);
-    mesh.clear();
-    points.clear();
-    indexs.clear();
-    int step = 2;
-    
-    // Populate vertex
-  
-    for(int y = 0; y < h; y += step) {
-        vector<ofVec3f> temppoints;
-        vector<ofColor> tempcolors;
+        kinectUtils.processKinectData();
+        int w = 640;
+        int h = 480;
+        //    for(int i = 0; i < smoothCount; i++ ){
+        //        smoothArray( pix );
+        //    }
+        //    if(temporalSmoothing != 0.0){
+        //        for(int i = 0; i < h*w; i++){
+        //            int diff =pix[i] - kinectDepth[i];
+        //            int pixd = pix[i];
+        //
+        //            if(abs(diff) > 90){
+        //                kinectDepth[i] = pixd;
+        //                /*
+        //                pixd = kinectDepth[i];
+        //                if( diff > 0 ){
+        //                    pixd += 90;
+        //                }else{
+        //                    pixd -= 90;
+        //                }
+        //                 */
+        //            }
+        //            kinectDepth[i] = kinectDepth[i] * temporalSmoothing + pixd * (1.0-temporalSmoothing);
+        //            pix[i] = kinectDepth[i];
+        //        }
+        //    }
+        //    }
+        //ofMesh mesh;
+        //  mesh.setMode(OF_PRIMITIVE_TRIANGLES);
+        mesh.clear();
+        points.clear();
+        indexs.clear();
+        int step = meshResolution;
         
-        points.push_back(temppoints);
-        colors.push_back(tempcolors);
-        for(int x = 0; x < w; x += step) {
-            float distance = kinect.getDistanceAt(x, y);
-            if(distance > front && distance < back) {
+        
+        for(int y = 0; y < h; y += step) {
+            vector<ofVec3f> temppoints;
+            vector<ofColor> tempcolors;
+            points.push_back(temppoints);
+            colors.push_back(tempcolors);
+            for(int x = 0; x < w; x += step) {
+                float distance = kinect.getDistanceAt(x, y);
                 mesh.addColor(ofColor::white);
                 ofVec3f tempPoint;
-                tempPoint = kinect.getWorldCoordinateAt(x, y);
+                tempPoint = kinectUtils.getProcessedVertex(x, y);
                 points[y / step].push_back(tempPoint);
-            }else{
-                ofVec3f tempPoint2;
-                ofColor tempColor2;
-                tempPoint2 = ofVec3f(x, y, 0);
-                points[y / step].push_back(tempPoint2);
             }
         }
-    }
-    
-    // Create Vertex Indexes
-    int ind = 0;
-    for (int m = 0; m < h; m += step) {
-        vector<int> tempindexs;
-        indexs.push_back(tempindexs);
         
-        for (int n = 0; n < w; n += step) {
-            if (points[m / step][n / step].z != 0) {
-                ofVec3f ptTemp= points[m / step][n / step];
-                mesh.addVertex(ptTemp);
-                indexs[m / step].push_back(ind);
-                ind++;
-            } else {
-                indexs[m / step].push_back(-1);
-            }
-        }
-    }
-    
-    // Delanuay triangulation
-    int W = int(w / step);
-    for (int b = 0; b < h - step; b += step) {
-        for (int a = 0; a < w - 1; a += step) {
-            if ((indexs[int(b / step)][int(a / step)] != -1 &&
-                 indexs[int(b / step)][int(a / step + 1)] != -1) &&
-                (indexs[int(b / step + 1)][int(a / step + 1)] != -1 &&
-                 indexs[int(b / step + 1)][int(a / step)] != -1)) {
-                    
-                    mesh.addTriangle(indexs[int(b / step)][int(a / step)],
-                                     indexs[int(b / step)][int(a / step + 1)],
-                                     indexs[int(b / step + 1)][int(a / step + 1)]);
-                    mesh.addTriangle(indexs[int(b / step)][int(a / step)],
-                                     indexs[int(b / step + 1)][int(a / step + 1)],
-                                     indexs[int(b / step + 1)][int(a / step)]);
+        // Create Vertex Indexes
+        int ind = 0;
+        for (int m = 0; m < h; m += step) {
+            vector<int> tempindexs;
+            indexs.push_back(tempindexs);
+            
+            for (int n = 0; n < w; n += step) {
+                if (points[m / step][n / step].z != 0) {
+                    ofVec3f ptTemp= points[m / step][n / step];
+                    mesh.addVertex(ptTemp);
+                    indexs[m / step].push_back(ind);
+                    ind++;
+                } else {
+                    indexs[m / step].push_back(-1);
                 }
+            }
         }
-    }
-    
-    // Calculate normals
-    calcNormals(mesh);
-      //  setNormals(mesh);
         
+        // Delanuay triangulation
+        int W = int(w / step);
+        for (int b = 0; b < h - step; b += step) {
+            for (int a = 0; a < w - 1; a += step) {
+                if ((indexs[int(b / step)][int(a / step)] != -1 &&
+                     indexs[int(b / step)][int(a / step + 1)] != -1) &&
+                    (indexs[int(b / step + 1)][int(a / step + 1)] != -1 &&
+                     indexs[int(b / step + 1)][int(a / step)] != -1)) {
+                        
+                        mesh.addTriangle(indexs[int(b / step)][int(a / step)],
+                                         indexs[int(b / step)][int(a / step + 1)],
+                                         indexs[int(b / step + 1)][int(a / step + 1)]);
+                        mesh.addTriangle(indexs[int(b / step)][int(a / step)],
+                                         indexs[int(b / step + 1)][int(a / step + 1)],
+                                         indexs[int(b / step + 1)][int(a / step)]);
+                    }
+            }
+        }
+        
+        // Calculate normals
+        //calcNormals(mesh);
+        // Faster normal calculations
+        setNormals(mesh);
         //Fatten algorithm
-//        for (int i = 0; i < mesh.getIndices().size(); i++) {
-//            const int ia = mesh.getIndices()[i];
-//            if (ia < mesh.getVertices().size() ) {
-//                
-//                //ofVec3f e1 = mesh.getVertices()[ia];
-//                ofVec3f norml = mesh.getNormals()[ia];
-//                float hello = sqrt(4);
-//                
-//                float l = sqrt(norml[0]*norml[0]+norml[1]*norml[1]+norml[2]*norml[2]);
-//                
-//                if (l != 0.0){
-//                    mesh.getVertices()[ia] = mesh.getVertices()[ia] + (norml*0.9*-3*fatten)/l;
-//                }
-//                
-//            }
-//        }
+        for (int i = 0; i < mesh.getIndices().size(); i++) {
+            const int ia = mesh.getIndices()[i];
+            if (ia < mesh.getVertices().size() ) {
+                
+                //ofVec3f e1 = mesh.getVertices()[ia];
+                ofVec3f norml = mesh.getNormals()[ia];
+                float hello = sqrt(4);
+                
+                float l = sqrt(norml[0]*norml[0]+norml[1]*norml[1]+norml[2]*norml[2]);
+                
+                if (l != 0.0){
+                    mesh.getVertices()[ia] = mesh.getVertices()[ia] + (norml*0.9*-3*fatten)/l;
+                }
+                
+            }
+        }
         
     }
 }
-
 
 void ofApp::updateKinectMesh(){
     kinect0.update();
@@ -1214,11 +1030,8 @@ void ofApp::updateKinectMesh(){
                         if (l != 0.0){
                             mesh.getVertices()[ia] += norml*fatten*3.0/l;
                         }
-                        
                     }
                 }
-                
-                
             }
         }
         kinectFrameLimiter++;
@@ -1240,9 +1053,10 @@ void ofApp::draw() {
     if(showSolvers){drawSolvers();};
     ofDisableDepthTest();
     drawGui();
+    
+   // kinectUtils.drawProcessing(0,0);
    // grayImage.draw(0,0);
 }
-
 
 void ofApp::drawPointCloudMode(){
     mesh.setUsage(GL_DYNAMIC_DRAW);
@@ -1254,8 +1068,8 @@ void ofApp::drawPointCloudMode(){
         ofPushMatrix();
         //ofRotateZ(-180);
         //ofTranslate(-kinect0.getDepthPixelsRef().getWidth()/2, -kinect0.getDepthPixelsRef().getHeight()/2, +600);
-        ofScale(1, -1, -1);
-        ofTranslate(0, 0, -1000);
+      //  ofScale(1, -1, -1);
+       // ofTranslate(0, 0, -1000);
         mesh.draw();
         ofPopMatrix();
         
@@ -1287,11 +1101,11 @@ void ofApp::drawCubeMapMode(){
     cubeMapShader.setUniform3f("pos_eye", cam.getPosition());
     ofPushMatrix();
     //ofRotateZ(-180);
-    sphere.draw();
+   // sphere.draw();
     
     //ofTranslate(-kinect0.getDepthPixelsRef().getWidth()/2, -kinect0.getDepthPixelsRef().getHeight()/2, +600);
-    ofScale(1, -1, -1);
-    ofTranslate(0, 0, -1000);
+   // ofScale(1, -1, -1);
+    ofTranslate(0, 0,400);
     mesh.drawFaces();
     ofPopMatrix();
     cubeMapShader.end();
@@ -1300,6 +1114,7 @@ void ofApp::drawCubeMapMode(){
    
     cam.end();
 };
+
 void ofApp::drawTexturedMode(){
     
     updateLights();
@@ -1310,8 +1125,8 @@ void ofApp::drawTexturedMode(){
     ofPushMatrix();
    // ofRotateZ(-180);
     //ofTranslate(-kinect0.getDepthPixelsRef().getWidth()/2, -kinect0.getDepthPixelsRef().getHeight()/2, +600);
-    ofScale(1, -1, -1);
-    ofTranslate(0, 0, -1000);
+  //  ofScale(1, -1, -1);
+ //   ofTranslate(0, 0, -1000);
     mesh.drawFaces();
     ofDrawAxis(100);
     ofPopMatrix();
@@ -1341,11 +1156,10 @@ void ofApp::drawTexturedMode(){
 
 void ofApp::drawGui(){
     ofSetColor(255, 255, 255);
-    if (bShowHelp) {
         ofDrawBitmapString( "FrameRate (Fr) : " + ofToString(ofGetFrameRate()) + "\n" +
                            + "Delay (d) : " + ofToString(delayMode) + "\n" ,
                            20, 20);
-    }
+    
     gui.draw();
 };
 
@@ -1474,7 +1288,6 @@ void ofApp::keyPressed(int key) {
     
 }
 
-
 void ofApp::setupSolver(){
     for(int i=0; i<strlen(sz); i++) sz[i] += 20;
     
@@ -1579,12 +1392,9 @@ void ofApp:: setupKinect(){
         ofLogNotice() << "zero plane dist: " << kinect.getZeroPlaneDistance() << "mm";
     }
     
-    nearThreshold = 230;
-    farThreshold = 70;
+    kinectUtils.setup(&kinect);
+    
     bThreshWithOpenCV = true;
-    
-    ofSetFrameRate(60);
-    
     // zero the tilt on startup
     angle = 0;
     kinect.setCameraTiltAngle(angle);

@@ -4,14 +4,14 @@
 class parallelise {
 public:
     template<class c_l_a_s_s>
-    void for_all(void (c_l_a_s_s::*otherFunction)(int), int start, int end) {
-                void (c_l_a_s_s::*with)(int) ;
+    void for_all(void (c_l_a_s_s::*otherFunction)(int,ofShortPixels &pix), int start, int end,ofShortPixels &pix) {
+                void (c_l_a_s_s::*with)(int,ofShortPixels &pix) ;
                 c_l_a_s_s * doTask;
                 with = otherFunction;
                 dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
                 dispatch_apply(end-start, queue, ^(size_t blockIdx) {
                     int i = start+blockIdx;
-                    (doTask->*with)(i);
+                    (doTask->*with)(i,std::ref(pix));
                 });}
     
     template<class c_l_a_s_s>
