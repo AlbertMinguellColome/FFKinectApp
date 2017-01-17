@@ -25,6 +25,7 @@ void setupAbleton(){
 void ofApp::setup() {
     
     setupGui();
+    ofSetDataPathRoot("../Resources/data/");
     ofSetLogLevel(OF_LOG_VERBOSE);
     // disable vertical Sync is too bad with light sometimes
     ofSetVerticalSync(true);
