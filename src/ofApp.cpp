@@ -118,7 +118,7 @@ void ofApp::setupGui(){
     gui.add(isSmoothingThresholdOnly.setup("isSmoothingThresholdOnly",0,25,25));
     gui.add(isNormalMapThresholdOnly.setup("isNormalMapThresholdOnly",0,25,25));
     gui.add(nearThreshold.setup("nearThreshold",0.0,0,4000));
-    gui.add(farThreshold.setup("farThreshold",4000,0,4000));
+    gui.add(farThreshold.setup("farThreshold",1520,0,4000));
     gui.add(meshBlurRadius.setup("meshBlurRadius",1,0,10));
     gui.add(zAveragingMaxDepth.setup("zAveragingMaxDepth",195,0,200));
     gui.add(blankDepthPixMax.setup("blankDepthPixMax",7,0,10));
@@ -133,12 +133,12 @@ void ofApp::setupGui(){
     gui.add(meshMode.setup("meshMode",3,1,4));  // It change mesh mode POINTS, LINES ,TRIANGLES = activates delanuay, LINES_LOOP
     gui.add(meshType.setup("meshType",2,1,3));// Changes between standard pointCloud , CubeMap and Texture mode
     gui.add(dummy.setup("dummy",0.1,-1,1));
-    gui.add(meshResolution.setup("meshResolutionSlider",4,1,16)); //Increase-decrease resolution, use always pair values
+    gui.add(meshResolution.setup("meshResolutionSlider",2,1,16)); //Increase-decrease resolution, use always pair values
     gui.add(displacement.setup("displacement",6,2,8)); // adjust kinect points Z-postion
     gui.add(cubeMapSelector.setup("cubeMapSelector",1,1,4));  // Change cube map images use with meshType = 3
     gui.add(displacementAmount.setup("displacementAmount",0.0,0,0.2));
     gui.add(cameraDistance.setup("cameraDistance",500,100,2000));
-    gui.add(fatten.setup("fatten",0,-1,1));
+    gui.add(fatten.setup("fatten",0,-5,5));
     gui.add(cameraZoom.setup("cameraZoom",0,25,25)); //Zoom in-out cam.
     gui.add(drawLights.setup("drawLights",0,25,25));
     gui.add(activateLightStrobe.setup("activateLightStrobe",0,25,25));
@@ -319,9 +319,12 @@ void ofApp::changeCubeMapImages(int textureSelector, ofxCubeMap &myCubeMap) {
             break;
         case 1:
             myCubeMap.loadImages(
-                                 "ame_bluefreeze/bluefreeze_rt.tga", "ame_bluefreeze/bluefreeze_lf.tga",
-                                 "ame_bluefreeze/bluefreeze_up.tga", "ame_bluefreeze/bluefreeze_dn.tga",
-                                 "ame_bluefreeze/bluefreeze_ft.tga", "ame_bluefreeze/bluefreeze_bk.tga");
+                                 "warehouse/px.jpg",
+                                 "warehouse/nx.jpg",
+                                 "warehouse/py.jpg",
+                                 "warehouse/ny.jpg",
+                                 "warehouse/pz.jpg",
+                                 "warehouse/nz.jpg");
             break;
         case 2:
             myCubeMap.loadImages("mp_ss/ss_rt.tga", "mp_ss/ss_lf.tga",
@@ -1110,7 +1113,7 @@ void ofApp::drawCubeMapMode(){
     mesh.drawFaces();
     ofPopMatrix();
     cubeMapShader.end();
-    myCubeMap.drawSkybox(2000);
+    //myCubeMap.drawSkybox(2000);
     myCubeMap.unbind();
    
     cam.end();
@@ -1398,7 +1401,7 @@ void ofApp:: setupKinect(){
     bThreshWithOpenCV = true;
     // zero the tilt on startup
     angle = 0;
-    kinect.setCameraTiltAngle(angle);
+//    kinect.setCameraTiltAngle(angle);
     // start from the front
     bDrawPointCloud = false;
 
