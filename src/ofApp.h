@@ -202,7 +202,7 @@ public:
     void depthFilter (ofShortPixels & pix);
     void processAverageDepth(ofShortPixels & kinectDepth);
     void processDepth(int depthArrayRowIndex);
-    void smoothArray(int process,ofShortPixels &pix);
+    void smoothArray(ofShortPixels &pix);
     //Calculates mesh normals
     void calcNormals(ofMesh &mesh);
     //Draws panel with all parameters

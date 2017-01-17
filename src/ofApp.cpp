@@ -115,37 +115,34 @@ void ofApp::setupGui(){
     gui.setPosition(0, 40);
     gui.add(frameRate.setup("frameRate",60,1,60));
     gui.add(isDepthSmoothingActive.setup("isDepthSmoothingActive",0,25,25));
-    gui.add(isSmoothingThresholdOnly.setup("isSmoothingThresholdOnly",0,25,25));
-    gui.add(isNormalMapThresholdOnly.setup("isNormalMapThresholdOnly",0,25,25));
+    gui.add(meshBlurRadius.setup("meshBlurRadius",1,0,10));
+//    gui.add(isSmoothingThresholdOnly.setup("isSmoothingThresholdOnly",0,25,25)); // TODO : Test with shader
+//    gui.add(isNormalMapThresholdOnly.setup("isNormalMapThresholdOnly",0,25,25)); // TODO : Test with shader
     gui.add(nearThreshold.setup("nearThreshold",0.0,0,4000));
     gui.add(farThreshold.setup("farThreshold",1520,0,4000));
-    gui.add(meshBlurRadius.setup("meshBlurRadius",1,0,10));
-    gui.add(zAveragingMaxDepth.setup("zAveragingMaxDepth",195,0,200));
-    gui.add(blankDepthPixMax.setup("blankDepthPixMax",7,0,10));
+//  gui.add(zAveragingMaxDepth.setup("zAveragingMaxDepth",195,0,200));  // TODO : Test with shader
+//  gui.add(blankDepthPixMax.setup("blankDepthPixMax",7,0,10)); // TODO : Test with shader
     gui.add(activateSmooth.setup("activateSmooth",0,25,25));
-    gui.add(innerThreshold.setup("innerThreshold",0,0,10));
-    gui.add(outerThreshold.setup("outerThreshold",0,0,10));
-    gui.add(front.setup("frontSlider",607,0,1500));
-    gui.add(back.setup("backSlider",1680,0,8000));
+//  gui.add(front.setup("frontSlider",607,0,1500));  // works with kinect 2
+//  gui.add(back.setup("backSlider",1680,0,8000)); // works with kinect 2
     gui.add(smoothCount.setup("smoothCount",2,1,10));
     gui.add(temporalSmoothing.setup("temporalSmoothing",0,0,1));
-    gui.add(pointSize.setup("pointSize",2,0,100));  // Increase-decrease point size use it with meshMode = 1 (GL_POINTS)
     gui.add(meshMode.setup("meshMode",3,1,4));  // It change mesh mode POINTS, LINES ,TRIANGLES = activates delanuay, LINES_LOOP
     gui.add(meshType.setup("meshType",2,1,3));// Changes between standard pointCloud , CubeMap and Texture mode
-    gui.add(dummy.setup("dummy",0.1,-1,1));
     gui.add(meshResolution.setup("meshResolutionSlider",2,1,16)); //Increase-decrease resolution, use always pair values
-    gui.add(displacement.setup("displacement",6,2,8)); // adjust kinect points Z-postion
+    gui.add(displacement.setup("displacement",0,-300,300)); // adjust kinect points Z-postion
+    gui.add(fatten.setup("fatten",0,1,-1));
+    gui.add(dummy.setup("dummy",0.1,-1,1));
     gui.add(cubeMapSelector.setup("cubeMapSelector",1,1,4));  // Change cube map images use with meshType = 3
-    gui.add(displacementAmount.setup("displacementAmount",0.0,0,0.2));
+  //  gui.add(displacementAmount.setup("displacementAmount",0.0,0,0.2));// TODO : Test with shader
     gui.add(cameraDistance.setup("cameraDistance",500,100,2000));
-    gui.add(fatten.setup("fatten",0,-5,5));
     gui.add(cameraZoom.setup("cameraZoom",0,25,25)); //Zoom in-out cam.
     gui.add(drawLights.setup("drawLights",0,25,25));
     gui.add(activateLightStrobe.setup("activateLightStrobe",0,25,25));
     gui.add(lightStrobeFrequency.setup("lightStrobeFrequency",2,0,3));
     gui.add(flashSpeed.setup("flashSpeed",1,1,3));
-    gui.add(cameraSpin.setup("cameraSpin",0,25,25));
-    gui.add(activateParticles.setup("activateParticles",0,25,25)); // test with particles to future simulate delays , Atention! Drops FPS if not set higher values of meshResolution
+//  gui.add(cameraSpin.setup("cameraSpin",0,25,25)); // TODO : check if it's finally interesting to implement it, was just an idea.
+//  gui.add(activateParticles.setup("activateParticles",0,25,25)); // test with particles to future simulate delays , Atention! Drops FPS if not set higher values of meshResolution
     gui.add(showSolvers.setup("showSolvers",0,25,25));
     
     
@@ -545,7 +542,7 @@ void ofApp::updateCamera(){
     cam.setDistance(cameraDistance);
 }
 
-void ofApp:: smoothArray(int process, ofShortPixels &pix ){
+void ofApp:: smoothArray(ofShortPixels &pix ){
 //    printf("IN SMOOTH!\n");
     int w = 640;
     int h = 480;
@@ -615,30 +612,33 @@ void ofApp::updateKinectV1Mesh() {
         kinectUtils.processKinectData();
         int w = 640;
         int h = 480;
-        //    for(int i = 0; i < smoothCount; i++ ){
-        //        smoothArray( pix );
-        //    }
-        //    if(temporalSmoothing != 0.0){
-        //        for(int i = 0; i < h*w; i++){
-        //            int diff =pix[i] - kinectDepth[i];
-        //            int pixd = pix[i];
-        //
-        //            if(abs(diff) > 90){
-        //                kinectDepth[i] = pixd;
-        //                /*
-        //                pixd = kinectDepth[i];
-        //                if( diff > 0 ){
-        //                    pixd += 90;
-        //                }else{
-        //                    pixd -= 90;
-        //                }
-        //                 */
-        //            }
-        //            kinectDepth[i] = kinectDepth[i] * temporalSmoothing + pixd * (1.0-temporalSmoothing);
-        //            pix[i] = kinectDepth[i];
-        //        }
-        //    }
-        //    }
+        ofShortPixels  pix = kinect.getRawDepthPixels();
+        if(activateSmooth){
+            for(int i = 0; i < smoothCount; i++ ){
+                smoothArray( pix );
+            }
+            if(temporalSmoothing != 0.0){
+                for(int i = 0; i < h*w; i++){
+                    int diff =pix[i] - kinectDepth[i];
+                    int pixd = pix[i];
+        
+                    if(abs(diff) > 90){
+                        kinectDepth[i] = pixd;
+                        /*
+                        pixd = kinectDepth[i];
+                        if( diff > 0 ){
+                            pixd += 90;
+                        }else{
+                            pixd -= 90;
+                        }
+                         */
+                    }
+                    kinectDepth[i] = kinectDepth[i] * temporalSmoothing + pixd * (1.0-temporalSmoothing);
+                    pix[i] = kinectDepth[i];
+                }
+            }
+        }
+        
         //ofMesh mesh;
         //  mesh.setMode(OF_PRIMITIVE_TRIANGLES);
         mesh.clear();
@@ -714,7 +714,7 @@ void ofApp::updateKinectV1Mesh() {
                 float l = sqrt(norml[0]*norml[0]+norml[1]*norml[1]+norml[2]*norml[2]);
                 
                 if (l != 0.0){
-                    mesh.getVertices()[ia] = mesh.getVertices()[ia] + (norml*0.9*-3*fatten)/l;
+                    mesh.getVertices()[ia] = mesh.getVertices()[ia] + (norml*3*fatten)/l;
                 }
                 
             }
@@ -1074,6 +1074,7 @@ void ofApp::drawPointCloudMode(){
         //ofTranslate(-kinect0.getDepthPixelsRef().getWidth()/2, -kinect0.getDepthPixelsRef().getHeight()/2, +600);
       //  ofScale(1, -1, -1);
        // ofTranslate(0, 0, -1000);
+        ofTranslate(0, 0,400 + displacement);
         mesh.draw();
         ofPopMatrix();
         
@@ -1109,7 +1110,7 @@ void ofApp::drawCubeMapMode(){
     
     //ofTranslate(-kinect0.getDepthPixelsRef().getWidth()/2, -kinect0.getDepthPixelsRef().getHeight()/2, +600);
    // ofScale(1, -1, -1);
-    ofTranslate(0, 0,400);
+    ofTranslate(0, 0,400 + displacement);
     mesh.drawFaces();
     ofPopMatrix();
     cubeMapShader.end();
@@ -1131,6 +1132,7 @@ void ofApp::drawTexturedMode(){
     //ofTranslate(-kinect0.getDepthPixelsRef().getWidth()/2, -kinect0.getDepthPixelsRef().getHeight()/2, +600);
   //  ofScale(1, -1, -1);
  //   ofTranslate(0, 0, -1000);
+    ofTranslate(0, 0,400 + displacement);
     mesh.drawFaces();
     ofDrawAxis(100);
     ofPopMatrix();
@@ -1397,6 +1399,8 @@ void ofApp:: setupKinect(){
     }
     
     kinectUtils.setup(&kinect);
+    kinectUtils.setFarThreshold(farThreshold);
+    kinectUtils.setNearThreshold(nearThreshold);
     
     bThreshWithOpenCV = true;
     // zero the tilt on startup
