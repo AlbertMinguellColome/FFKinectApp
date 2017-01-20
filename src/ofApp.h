@@ -24,7 +24,7 @@ enum meshType
 {
     pointCloudMesh = 1,
     cubeMapMesh=2,
-    texturedMesh=3
+    texturedMesh=3,
 };
 
 class ofApp : public ofBaseApp,ofThread{
@@ -110,7 +110,10 @@ public:
     //Gui Panel
     ofxPanel gui;
     ofxIntSlider  front;
-    ofxFloatSlider  dummy;
+    ofxFloatSlider  dummyY;
+    ofxFloatSlider  dummyX;
+//    ofxIntSlider  radiusLights;
+    ofxFloatSlider  translateMesh;
     ofxIntSlider  innerThreshold;
     ofxIntSlider  frameRate;
     ofxIntSlider  outerThreshold;

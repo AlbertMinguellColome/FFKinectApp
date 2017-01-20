@@ -53,6 +53,7 @@ void ofApp::setup() {
     // Cube map setup
     textureSelector = 0;
     
+
     myCubeMap.loadImages(
                          "warehouse/px.jpg",
                          "warehouse/nx.jpg",
@@ -112,36 +113,40 @@ void ofApp::setup() {
 void ofApp::setupGui(){
     
     gui.setup();
-    gui.setPosition(0, 40);
+    gui.setPosition(-1000,-1000);
     gui.add(frameRate.setup("frameRate",60,1,60));
     gui.add(isDepthSmoothingActive.setup("isDepthSmoothingActive",0,25,25));
     gui.add(meshBlurRadius.setup("meshBlurRadius",1,0,10));
+    gui.add(translateMesh.setup("translateMesh",900,0,1500));
+
 //    gui.add(isSmoothingThresholdOnly.setup("isSmoothingThresholdOnly",0,25,25)); // TODO : Test with shader
 //    gui.add(isNormalMapThresholdOnly.setup("isNormalMapThresholdOnly",0,25,25)); // TODO : Test with shader
-    gui.add(nearThreshold.setup("nearThreshold",0.0,0,4000));
-    gui.add(farThreshold.setup("farThreshold",1520,0,4000));
+    gui.add(nearThreshold.setup("nearThreshold",120,0,4000));
+    gui.add(farThreshold.setup("farThreshold",1420,0,4000));
 //  gui.add(zAveragingMaxDepth.setup("zAveragingMaxDepth",195,0,200));  // TODO : Test with shader
 //  gui.add(blankDepthPixMax.setup("blankDepthPixMax",7,0,10)); // TODO : Test with shader
-    gui.add(activateSmooth.setup("activateSmooth",0,25,25));
+   // gui.add(activateSmooth.setup("activateSmooth",0,25,25));
 //  gui.add(front.setup("frontSlider",607,0,1500));  // works with kinect 2
 //  gui.add(back.setup("backSlider",1680,0,8000)); // works with kinect 2
     gui.add(smoothCount.setup("smoothCount",2,1,10));
     gui.add(temporalSmoothing.setup("temporalSmoothing",0,0,1));
     gui.add(meshMode.setup("meshMode",3,1,4));  // It change mesh mode POINTS, LINES ,TRIANGLES = activates delanuay, LINES_LOOP
-    gui.add(meshType.setup("meshType",2,1,3));// Changes between standard pointCloud , CubeMap and Texture mode
+    gui.add(meshType.setup("meshType",3,1,3));// Changes between standard pointCloud , CubeMap and Texture mode
     gui.add(meshResolution.setup("meshResolutionSlider",2,1,16)); //Increase-decrease resolution, use always pair values
     gui.add(displacement.setup("displacement",0,-300,300)); // adjust kinect points Z-postion
-    gui.add(fatten.setup("fatten",0,1,-1));
-    gui.add(dummy.setup("dummy",0.1,-1,1));
+    gui.add(fatten.setup("fatten",0,-4,4));
+    gui.add(dummyY.setup("dummyY",1.0,-1,2));
+    gui.add(dummyX.setup("dummyX",0.16,-1,1));
+//    gui.add(radius.setup("radius",400,0,2000));
     gui.add(cubeMapSelector.setup("cubeMapSelector",1,1,4));  // Change cube map images use with meshType = 3
   //  gui.add(displacementAmount.setup("displacementAmount",0.0,0,0.2));// TODO : Test with shader
-    gui.add(cameraDistance.setup("cameraDistance",500,100,2000));
+    gui.add(cameraDistance.setup("cameraDistance",450,100,2000));
     gui.add(cameraZoom.setup("cameraZoom",0,25,25)); //Zoom in-out cam.
     gui.add(drawLights.setup("drawLights",0,25,25));
     gui.add(activateLightStrobe.setup("activateLightStrobe",0,25,25));
     gui.add(lightStrobeFrequency.setup("lightStrobeFrequency",2,0,3));
     gui.add(flashSpeed.setup("flashSpeed",1,1,3));
-//  gui.add(cameraSpin.setup("cameraSpin",0,25,25)); // TODO : check if it's finally interesting to implement it, was just an idea.
+    gui.add(cameraSpin.setup("cameraSpin",0,25,25)); // TODO : check if it's finally interesting to implement it, was just an idea.
 //  gui.add(activateParticles.setup("activateParticles",0,25,25)); // test with particles to future simulate delays , Atention! Drops FPS if not set higher values of meshResolution
     gui.add(showSolvers.setup("showSolvers",0,25,25));
     
@@ -155,7 +160,12 @@ void ofApp::setupGui(){
     meshBlurRadius.addListener(this,&ofApp::setMeshBlurRadius);
     //zAveragingMaxDepth.addListener(this,&ofApp::setDepthSmoothingActive);
     //  blankDepthPixMax.addListener(this, &ofApp::setBlankDepthPixMax);
+    
+
 }
+
+
+
 
 void ofApp::setDepthSmoothingActive(bool &val){
     kinectUtils.setDepthSmoothingActive(val);
@@ -260,7 +270,7 @@ static void setNormals( ofMesh &mesh ){
         const ofPoint &v3 = mesh.getVertex( i3 );
         
         //Compute the triangle's normal
-        ofPoint dir = ( (v2 - v1).crossed( v3 - v1 ) ).normalized();
+        ofPoint dir = ( (v2 - v1).getCrossed( v3 - v1 ) ).getNormalized();
         
         //Accumulate it to norm array for i1, i2, i3
         norm[ i1 ] += dir;
@@ -286,10 +296,12 @@ void ofApp::changeMeshMode(int &meshSelector){
     switch (meshSelector) {
         case 1:{
             mesh.setMode(OF_PRIMITIVE_POINTS);
+   
         }
             break;
         case 2:{
             mesh.setMode(OF_PRIMITIVE_LINES);
+
         }
             break;
         case 3:{
@@ -298,7 +310,9 @@ void ofApp::changeMeshMode(int &meshSelector){
             break;
         case 4:{
             mesh.setMode(OF_PRIMITIVE_LINE_LOOP);
+  
         }
+    
             break;
             
         default:
@@ -307,6 +321,9 @@ void ofApp::changeMeshMode(int &meshSelector){
 }
 
 void ofApp::changeMeshType(int &meshTypeSelector){
+    if (meshType == 1){meshMode = 1;};
+    if (meshType == 2){meshMode = 3;};
+    if (meshType == 3){meshMode = 3;};
 }
 
 void ofApp::changeCubeMapImages(int textureSelector, ofxCubeMap &myCubeMap) {
@@ -323,22 +340,43 @@ void ofApp::changeCubeMapImages(int textureSelector, ofxCubeMap &myCubeMap) {
                                  "warehouse/pz.jpg",
                                  "warehouse/nz.jpg");
             break;
+//        case 2:
+//            myCubeMap.loadImages(
+//                                 "greenery/px.png",
+//                                 "greenery/nx.png",
+//                                 "greenery/py.png",
+//                                 "greenery/ny.png",
+//                                 "greenery/pz.png",
+//                                 "greenery/nz.png");
+//            break;
+            
         case 2:
-            myCubeMap.loadImages("mp_ss/ss_rt.tga", "mp_ss/ss_lf.tga",
-                                 "mp_ss/ss_up.tga", "mp_ss/ss_dn.tga",
-                                 "mp_ss/ss_ft.tga", "mp_ss/ss_bk.tga");
+            myCubeMap.loadImages(
+                                 "icy/0004.png",
+                                 "icy/0002.png",
+                                 "icy/0006.png",
+                                 "icy/0005.png",
+                                 "icy/0001.png",
+                                 "icy/0003.png");
             break;
+  
         case 3:
             myCubeMap.loadImages(
-                                 "sb_iceflow/iceflow_rt.tga", "sb_iceflow/iceflow_lf.tga",
-                                 "sb_iceflow/iceflow_up.tga", "sb_iceflow/iceflow_dn.tga",
-                                 "sb_iceflow/iceflow_ft.tga", "sb_iceflow/iceflow_bk.tga");
+                                 "blue/0004.png",
+                                 "blue/0002.png",
+                                 "blue/0006.png",
+                                 "blue/0005.png",
+                                 "blue/0001.png",
+                                 "blue/0003.png");
             break;
         case 4:
             myCubeMap.loadImages(
-                                 "sb_strato/stratosphere_rt.tga", "sb_strato/stratosphere_lf.tga",
-                                 "sb_strato/stratosphere_up.tga", "sb_strato/stratosphere_dn.tga",
-                                 "sb_strato/stratosphere_ft.tga", "sb_strato/stratosphere_bk.tga");
+                                 "volcano/0004.png",
+                                 "volcano/0002.png",
+                                 "volcano/0006.png",
+                                 "volcano/0005.png",
+                                 "volcano/0001.png",
+                                 "volcano/0003.png");
             break;
             
         default:
@@ -366,14 +404,14 @@ void ofApp::setupLights(){
     pointLight.setSpecularColor(ofColor::black);
     pointLight.setPointLight();
     pointLight.setPosition(100, 0, -150);
-    pointLight.setAttenuation(0.0, 0.01);
+    pointLight.setAttenuation(0.0, 0.001);
     
     spotLight.setSpotlight();
     spotLight.setDiffuseColor(ofColor::whiteSmoke);
     spotLight.setSpecularColor(ofColor::whiteSmoke);
-    spotLight.setSpotlightCutOff(90);
+    spotLight.setSpotlightCutOff(100);
     spotLight.setSpotConcentration(45);
-    spotLight.setAttenuation(0.00, 0.001);
+    spotLight.setAttenuation(0.00, 0.0005);
     
     
     spotLight.setPosition(0, 200, -100);
@@ -381,23 +419,23 @@ void ofApp::setupLights(){
     spotLight90.setSpotlight();
     spotLight90.setDiffuseColor(ofColor::white);
     spotLight90.setSpecularColor(ofColor::white);
-    spotLight90.setSpotlightCutOff(50);
+    spotLight90.setSpotlightCutOff(100);
     spotLight90.setSpotConcentration(45);
-    spotLight90.setAttenuation(0.0, 0.001);
+    spotLight90.setAttenuation(0.0, 0.0001);
     
     spotLight180.setSpotlight();
     spotLight180.setDiffuseColor(ofColor::white);
     spotLight180.setSpecularColor(ofColor::white);
-    spotLight180.setSpotlightCutOff(50);
+    spotLight180.setSpotlightCutOff(100);
     spotLight180.setSpotConcentration(45);
-    spotLight180.setAttenuation(0.0, 0.001);
+    spotLight180.setAttenuation(0.0, 0.0001);
     
     spotLight270.setSpotlight();
     spotLight270.setDiffuseColor(ofColor::white);
     spotLight270.setSpecularColor(ofColor::white);
     spotLight270.setSpotlightCutOff(50);
     spotLight270.setSpotConcentration(45);
-    spotLight270.setAttenuation(0.0, 0.001);
+    spotLight270.setAttenuation(0.0, 0.0005);
     
     directionalLight.setDiffuseColor(ofColor::black);
     directionalLight.setSpecularColor(ofColor::black);
@@ -423,27 +461,27 @@ void ofApp::setupLights(){
 void ofApp::positionLights(){
     float xorig = 0;
     float zorig = 0;
-    float radius= 400;
+    float radius= 800;
     float x;
     float z;
-    float y = 200 + dummy*400;
+    float y = 200 + dummyY*400;
     
-    x = xorig + radius * cos(0 * PI / 180.0);
+    x = xorig + radius * cos(0 * PI / 180.0) +dummyX*400;
     z = zorig + radius * -sin(0 * PI / 180.0);
     spotLight.setPosition(x, y, z);
-    x = xorig + radius * cos(45 * PI / 180.0);
+    x = xorig + radius * cos(45 * PI / 180.0)+dummyX*400;
     z = zorig + radius * -sin(45 * PI / 180.0);
     spotLight45.setPosition(x, y, z);
-    x = xorig + radius * cos(90 * PI / 180.0);
+    x = xorig + radius * cos(90 * PI / 180.0)+dummyX*400;
     z = zorig + radius * -sin(90 * PI / 180.0);
     spotLight90.setPosition(x, y, z);
-    x = xorig + radius * cos(135 * PI / 180.0);
+    x = xorig + radius * cos(135 * PI / 180.0)+dummyX*400;
     z = zorig + radius * -sin(135 * PI / 180.0);
     spotLight135.setPosition(x, y, z);
-    x = xorig + radius * cos(180 * PI / 180.0);
+    x = xorig + radius * cos(180 * PI / 180.0)+dummyX*400;
     z = zorig + radius * -sin(180 * PI / 180.0);
     spotLight180.setPosition(x, y, z);
-    x = xorig + radius * cos(270 * PI / 180.0);
+    x = xorig + radius * cos(270 * PI / 180.0)+dummyX*400;
     z = zorig + radius * -sin(270 * PI / 180.0);
     spotLight270.setPosition(x, y, z);
 }
@@ -606,6 +644,7 @@ static void medianFilter(ofShortPixels & pix,int x, int y){
 
 void ofApp::updateKinectV1Mesh() {
     kinect.update();
+    positionLights();
     
     if (kinect.isFrameNew()) {
         
@@ -624,14 +663,14 @@ void ofApp::updateKinectV1Mesh() {
         
                     if(abs(diff) > 90){
                         kinectDepth[i] = pixd;
-                        /*
-                        pixd = kinectDepth[i];
-                        if( diff > 0 ){
-                            pixd += 90;
-                        }else{
-                            pixd -= 90;
-                        }
-                         */
+                       
+//                        pixd = kinectDepth[i];
+//                        if( diff > 0 ){
+//                            pixd += 90;
+//                        }else{
+//                            pixd -= 90;
+//                        }
+                        
                     }
                     kinectDepth[i] = kinectDepth[i] * temporalSmoothing + pixd * (1.0-temporalSmoothing);
                     pix[i] = kinectDepth[i];
@@ -699,9 +738,9 @@ void ofApp::updateKinectV1Mesh() {
         }
         
         // Calculate normals
-        //calcNormals(mesh);
+        calcNormals(mesh);
         // Faster normal calculations
-        setNormals(mesh);
+        //setNormals(mesh);
         //Fatten algorithm
         for (int i = 0; i < mesh.getIndices().size(); i++) {
             const int ia = mesh.getIndices()[i];
@@ -1062,25 +1101,29 @@ void ofApp::draw() {
    // grayImage.draw(0,0);
 }
 
+
 void ofApp::drawPointCloudMode(){
     mesh.setUsage(GL_DYNAMIC_DRAW);
     if (mesh.getVertices().size()) {
         ofPushStyle();
         glPointSize(pointSize);
         cam.begin();
-        ofDrawAxis(200);
+//        ofDrawAxis(200);
         ofPushMatrix();
+        ofRotateX(20);
         //ofRotateZ(-180);
         //ofTranslate(-kinect0.getDepthPixelsRef().getWidth()/2, -kinect0.getDepthPixelsRef().getHeight()/2, +600);
       //  ofScale(1, -1, -1);
        // ofTranslate(0, 0, -1000);
-        ofTranslate(0, 0,400 + displacement);
+        
+        ofTranslate(0, 0,translateMesh + displacement);
         mesh.draw();
         ofPopMatrix();
         
         if(activateParticles){
             ofPushMatrix();
             ofRotateZ(-180);
+            
             ofTranslate(-kinect0.getDepthPixelsRef().getWidth()/2, -kinect0.getDepthPixelsRef().getHeight()/2, +600);
             for(unsigned int i = 0; i < p.size(); i++){
                 //  printf("%f /n",p[i].pos.z);
@@ -1099,22 +1142,25 @@ void ofApp::drawPointCloudMode(){
 
 void ofApp::drawCubeMapMode(){
     cam.begin();
+    updateLights();
+    strobeLights();
     myCubeMap.bind();
     cubeMapShader.begin();
     cubeMapShader.setUniform1i("envMap", 0);
     cubeMapShader.setUniform1f("reflectivity", 1);
     cubeMapShader.setUniform3f("pos_eye", cam.getPosition());
     ofPushMatrix();
+    ofRotateX(20);
     //ofRotateZ(-180);
    // sphere.draw();
     
     //ofTranslate(-kinect0.getDepthPixelsRef().getWidth()/2, -kinect0.getDepthPixelsRef().getHeight()/2, +600);
    // ofScale(1, -1, -1);
-    ofTranslate(0, 0,400 + displacement);
+    ofTranslate(0, 0,translateMesh + displacement);
     mesh.drawFaces();
     ofPopMatrix();
     cubeMapShader.end();
-    //myCubeMap.drawSkybox(2000);
+//    myCubeMap.drawSkybox(2000);
     myCubeMap.unbind();
    
     cam.end();
@@ -1128,11 +1174,12 @@ void ofApp::drawTexturedMode(){
     cam.begin();
     phong.begin();
     ofPushMatrix();
+    ofRotateX(20);
    // ofRotateZ(-180);
     //ofTranslate(-kinect0.getDepthPixelsRef().getWidth()/2, -kinect0.getDepthPixelsRef().getHeight()/2, +600);
   //  ofScale(1, -1, -1);
  //   ofTranslate(0, 0, -1000);
-    ofTranslate(0, 0,400 + displacement);
+    ofTranslate(0, 0,translateMesh + displacement);
     mesh.drawFaces();
     ofDrawAxis(100);
     ofPopMatrix();
@@ -1175,64 +1222,110 @@ void ofApp::keyPressed(int key) {
     
     switch (key) {
         case OF_KEY_UP:
-            spotLight.setSpotlightCutOff(spotLight.getSpotlightCutOff() + 1);
+            cameraDistance = cameraDistance-30;
             break;
         case OF_KEY_DOWN:
-            spotLight.setSpotlightCutOff(spotLight.getSpotlightCutOff() - 1);
+            cameraDistance = cameraDistance+30;
             break;
         case OF_KEY_RIGHT:
-            spotLight.setSpotConcentration(spotLight.getSpotConcentration() + 1);
+            fatten = fatten+0.2;
             break;
         case OF_KEY_LEFT:
-            spotLight.setSpotConcentration(spotLight.getSpotConcentration() - 1);
+            fatten = fatten-0.2;
+            break;
+        case '`':
+            if (cameraSpin == 0){cameraSpin = 25;}
+            else {cameraSpin=0;};
             break;
         case '1':
-            bPointLight = !bPointLight;
-            if (bPointLight) {
-                phong.useLight(&pointLight);
-            } else {
-                phong.removeLight(&pointLight);
-            }
+//            bPointLight = !bPointLight;
+//            if (bPointLight) {
+//                phong.useLight(&pointLight);
+//            } else {
+//                phong.removeLight(&pointLight);
+//            }
+            meshType = 1;
+            
             break;
         case '2':
-            bSpotLight = !bSpotLight;
-            if (bSpotLight) {
-                phong.useLight(&spotLight);
-            } else {
-                phong.removeLight(&spotLight);
-            }
+//            bSpotLight = !bSpotLight;
+//            if (bSpotLight) {
+//                phong.useLight(&spotLight);
+//            } else {
+//                phong.removeLight(&spotLight);
+//            }
+            meshType = 3;
             break;
         case '3':
-            bDirLight = !bDirLight;
-            if (bDirLight) {
-                phong.useLight(&directionalLight);
-            } else {
-                phong.removeLight(&directionalLight);
-            }
+//            bDirLight = !bDirLight;
+//            if (bDirLight) {
+//                phong.useLight(&directionalLight);
+//            } else {
+//                phong.removeLight(&directionalLight);
+//            }
+            
+            meshType =2;
+            break;
+        case 'q':
+            if (activateLightStrobe == 0){activateLightStrobe = 25;}
+            else {activateLightStrobe=0;};
+            
+            
+            break;
+            
+        case '/':
+            if (showSolvers == 0){showSolvers = 25;}
+            else {showSolvers=0;};
+            
+            
+            break;
+        
+        case 'w':
+            meshMode =4;
             break;
         case '4':
-            textureSelector = 1;
+            textureSelector = 4;
             changeCubeMapImages(textureSelector, myCubeMap);
             break;
         case '5':
             textureSelector = 2;
             changeCubeMapImages(textureSelector, myCubeMap);
             break;
-        case '6':
+        case '6': 
+            textureSelector = 1;
+            changeCubeMapImages(textureSelector, myCubeMap);
+            break;
+            
+        case '7':
             textureSelector = 3;
             changeCubeMapImages(textureSelector, myCubeMap);
+            break;
+        case 'a':
+            angle = angle +5;
+            kinect.setCameraTiltAngle(angle);
+            if (angle>25){
+                angle=25;};
+
+            break;
+        case 'z':
+            angle = angle -5;
+            kinect.setCameraTiltAngle(angle);
+            if (angle<-25){
+                angle=-25;};
+            
+
             break;
             
         case 'e':
             bShowHelp = !bShowHelp;
             break;
-        case 'h':
-            if (mat.getSpecularColor() == ofFloatColor(1., 1., 1.)) {
-                mat.setSpecularColor(ofFloatColor(0., 0., 0.));
-            } else {
-                mat.setSpecularColor(ofFloatColor(1., 1., 1.));
-            }
-            break;
+//        case 'h':
+//            if (mat.getSpecularColor() == ofFloatColor(1., 1., 1.)) {
+//                mat.setSpecularColor(ofFloatColor(0., 0., 0.));
+//            } else {
+//                mat.setSpecularColor(ofFloatColor(1., 1., 1.));
+//            }
+//            break;
         case 's':
             if (phong.lightingMethod() == ofxShadersFX::Lighting::PHONG_LIGHTING) {
                 phong.setLightingMethod(ofxShadersFX::Lighting::BLINN_PHONG_LIGHTING);
@@ -1282,13 +1375,25 @@ void ofApp::keyPressed(int key) {
                 pointCloudMode = true;
             }
             break;
-        case 'z':
-            pos = sphere.getPosition();
-            pos[2] -= 5;
-            sphere.setPosition(pos);
+        case ',':
+            ofHideCursor();
             break;
+        case '.':
+            ofShowCursor();
+            break;
+//        case 'z':
+//            pos = sphere.getPosition();
+//            pos[2] -= 5;
+//            sphere.setPosition(pos);
+//            break;
         case 32:
             ofToggleFullscreen();
+            break;
+        case 'j':
+            gui.setPosition(-1000,-1000);
+            break;
+        case 'h':
+            gui.setPosition(0, 40);
             break;
     }
     
@@ -1405,7 +1510,7 @@ void ofApp:: setupKinect(){
     bThreshWithOpenCV = true;
     // zero the tilt on startup
     angle = 0;
-//    kinect.setCameraTiltAngle(angle);
+   
     // start from the front
     bDrawPointCloud = false;
 
