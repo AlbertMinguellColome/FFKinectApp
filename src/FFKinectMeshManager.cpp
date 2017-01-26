@@ -22,9 +22,11 @@ void FFKinectMeshManager::init (){
 
 
 void FFKinectMeshManager::setupKinectV1(){
+    
+    
+    kinectV1.init();
     // enable depth->video image calibration
     kinectV1.setRegistration(true);
-    kinectV1.init();
     //kinect.init(true); // shows infrared instead of RGB video image
     //kinect.init(false, false); // disable video image (faster fps)
     kinectV1.open();		// opens first available kinect
@@ -56,10 +58,12 @@ void FFKinectMeshManager::setupKinectV2(){
 void FFKinectMeshManager::setupGui(){
     
     gui.setup();
-    gui.add(isRGBMapActive.setup("isDepthSmoothingActive",0,25,25));
+    setGuiPosition(-1000,-1000);
+    gui.add(translateMesh.setup("translateMesh",900,0,1500));
+    gui.add(displacement.setup("displacement",0,-300,300)); // adjust kinect points Z-postion
+    gui.add(isRGBMapActive.setup("activateRGB",0,25,25));
     gui.add(isDepthSmoothingActive.setup("isDepthSmoothingActive",0,25,25));
     gui.add(meshBlurRadius.setup("meshBlurRadius",1,0,10));
-    
     //    gui.add(isSmoothingThresholdOnly.setup("isSmoothingThresholdOnly",0,25,25)); // TODO : Test with shader
     //    gui.add(isNormalMapThresholdOnly.setup("isNormalMapThresholdOnly",0,25,25)); // TODO : Test with shader
     gui.add(nearThreshold.setup("nearThreshold",120,0,4000));
@@ -69,8 +73,6 @@ void FFKinectMeshManager::setupGui(){
     gui.add(activateSmooth.setup("activateSmooth",0,25,25));
     gui.add(smoothCount.setup("smoothCount",2,1,10));
     gui.add(temporalSmoothing.setup("temporalSmoothing",0,0,1));
-    gui.add(meshMode.setup("meshMode",3,1,4));  // It change mesh mode POINTS, LINES ,TRIANGLES = activates delanuay, LINES_LOOP
-    gui.add(meshType.setup("meshType",3,1,3));// Changes between standard pointCloud , CubeMap and Texture mode
     gui.add(meshResolution.setup("meshResolutionSlider",2,1,16)); //Increase-decrease resolution, use always pair values
     gui.add(displacement.setup("displacement",0,-300,300)); // adjust kinect points Z-postion
     gui.add(fatten.setup("fatten",0,-4,4));
@@ -78,8 +80,6 @@ void FFKinectMeshManager::setupGui(){
     //    gui.add(radius.setup("radius",400,0,2000));
     //  gui.add(displacementAmount.setup("displacementAmount",0.0,0,0.2));// TODO : Test with shader
     //  gui.add(activateParticles.setup("activateParticles",0,25,25)); // test with particles to future simulate delays , Atention! Drops FPS if not set higher values of meshResolution
-    
-  
 
     isDepthSmoothingActive.addListener(this,&FFKinectMeshManager::setDepthSmoothingActive);
     nearThreshold.addListener(this,&FFKinectMeshManager::setNearThreshold);
@@ -88,22 +88,31 @@ void FFKinectMeshManager::setupGui(){
     //zAveragingMaxDepth.addListener(this,&ofApp::setDepthSmoothingActive);
     //  blankDepthPixMax.addListener(this, &ofApp::setBlankDepthPixMax);
 }
-void FFKinectMeshManager::drawGui(int x, int y){
-    gui.setPosition(x,y);
+void FFKinectMeshManager::drawGui(){
     gui.draw();
+}
+void FFKinectMeshManager::setGuiPosition(int x, int y){
+    gui.setPosition(x,y);
 }
 
 void FFKinectMeshManager::drawMesh(bool faced){
     if(faced){
+        ofTranslate(0, 0,translateMesh + displacement);
         mesh.draw();
     }else{
+        if(!isRGBMapActive){
+        ofTranslate(0, 0,translateMesh + displacement);
         mesh.drawFaces();
+        }else{
+        ofScale(1, -1, -1);
+        ofTranslate(0, 0, -1000);
+        meshPointcloud.drawVertices();
+        }
     }
 }
 
 void FFKinectMeshManager::processKinectV1Data(){
     kinectV1.update();
-  //  positionLights();
     if (kinectV1.isFrameNew()) {
         kinectUtils.processKinectData();
         int w = 640;
@@ -127,6 +136,7 @@ void FFKinectMeshManager::processKinectV1Data(){
             }
         }
         mesh.clear();
+        meshPointcloud.clear();
         points.clear();
         indexs.clear();
         int step = meshResolution;
@@ -138,8 +148,11 @@ void FFKinectMeshManager::processKinectV1Data(){
             for(int x = 0; x < w; x += step) {
                 float distance = kinectV1.getDistanceAt(x, y);
                 if(isRGBMapActive){
-                    ofColor vertexColor = kinectV1.getColorAt(x, y);
-                    mesh.addColor(vertexColor);
+                    if(distance>nearThreshold && distance<farThreshold){
+                        ofColor vertexColor = kinectV1.getColorAt(x, y);
+                        meshPointcloud.addColor(vertexColor);
+                        meshPointcloud.addVertex(kinectV1.getWorldCoordinateAt(x, y));
+                    }
                 }else{
                     mesh.addColor(ofColor::white);
                 }
@@ -198,6 +211,14 @@ void FFKinectMeshManager::processKinectV1Data(){
             }
         }
     }
+}
+
+ofVboMesh FFKinectMeshManager::getMesh(){
+    return mesh;
+}
+
+void FFKinectMeshManager::addFatten(float amount ){
+    fatten = fatten + amount;
 }
 
 void FFKinectMeshManager::processKinectV2Data(){
@@ -421,7 +442,7 @@ static void medianFilter(ofShortPixels & pix,int x, int y){
     }
 }
 
-void FFKinectMeshManager::changeMeshMode(int &meshSelector){
+void FFKinectMeshManager::setMeshType(int meshSelector){
     switch (meshSelector) {
         case 1:{
             mesh.setMode(OF_PRIMITIVE_POINTS);
@@ -445,11 +466,7 @@ void FFKinectMeshManager::changeMeshMode(int &meshSelector){
     }
 }
 
-void FFKinectMeshManager::changeMeshType(int &meshTypeSelector){
-    if (meshType == 1){meshMode = 1;};
-    if (meshType == 2){meshMode = 3;};
-    if (meshType == 3){meshMode = 3;};
-}
+
 
 void FFKinectMeshManager::setDepthSmoothingActive(bool &val){
     kinectUtils.setDepthSmoothingActive(val);

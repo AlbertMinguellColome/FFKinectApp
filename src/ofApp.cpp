@@ -83,31 +83,14 @@ void ofApp::setup() {
     //    ofAddListener(AbletonManager::getInstance().eventsVolumeChanged, this, &ofApp::volumeChanged);
     
     glShadeModel(GL_SMOOTH);
-    
-  
     useMultikinect = false;
+    kinectManager.init();
     
     if(useMultikinect){
-        // kinect setup
-        kinect0.open(true, true, 0, 2);
-        // Note :
-        // Default OpenCL device might not be optimal.
-        // e.g. Intel HD Graphics will be chosen instead of GeForce.
-        // To avoid it, specify OpenCL device index manually like following.
-        // kinect1.open(true, true, 0, 2); // GeForce on MacBookPro Retina
-        kinect0.start();
-        kinect0.update();
+        kinectManager.setupKinectV2();
     }else{
-          setupKinect();
+        kinectManager.setupKinectV1();
     }
-    int w = 640;
-    int h = 480;
-    
-    kinectDepth.allocate(w, h, 1);
-    for(int i = 0; i < h*w; i++){
-        kinectDepth[i] = 0;
-    }
-
 }
 
 void ofApp::setupGui(){
@@ -115,31 +98,14 @@ void ofApp::setupGui(){
     gui.setup();
     gui.setPosition(-1000,-1000);
     gui.add(frameRate.setup("frameRate",60,1,60));
-    gui.add(isDepthSmoothingActive.setup("isDepthSmoothingActive",0,25,25));
-    gui.add(meshBlurRadius.setup("meshBlurRadius",1,0,10));
     gui.add(translateMesh.setup("translateMesh",900,0,1500));
-
-//    gui.add(isSmoothingThresholdOnly.setup("isSmoothingThresholdOnly",0,25,25)); // TODO : Test with shader
-//    gui.add(isNormalMapThresholdOnly.setup("isNormalMapThresholdOnly",0,25,25)); // TODO : Test with shader
-    gui.add(nearThreshold.setup("nearThreshold",120,0,4000));
-    gui.add(farThreshold.setup("farThreshold",1420,0,4000));
-//  gui.add(zAveragingMaxDepth.setup("zAveragingMaxDepth",195,0,200));  // TODO : Test with shader
-//  gui.add(blankDepthPixMax.setup("blankDepthPixMax",7,0,10)); // TODO : Test with shader
-   // gui.add(activateSmooth.setup("activateSmooth",0,25,25));
-//  gui.add(front.setup("frontSlider",607,0,1500));  // works with kinect 2
-//  gui.add(back.setup("backSlider",1680,0,8000)); // works with kinect 2
-    gui.add(smoothCount.setup("smoothCount",2,1,10));
-    gui.add(temporalSmoothing.setup("temporalSmoothing",0,0,1));
     gui.add(meshMode.setup("meshMode",3,1,4));  // It change mesh mode POINTS, LINES ,TRIANGLES = activates delanuay, LINES_LOOP
     gui.add(meshType.setup("meshType",3,1,3));// Changes between standard pointCloud , CubeMap and Texture mode
-    gui.add(meshResolution.setup("meshResolutionSlider",2,1,16)); //Increase-decrease resolution, use always pair values
     gui.add(displacement.setup("displacement",0,-300,300)); // adjust kinect points Z-postion
-    gui.add(fatten.setup("fatten",0,-4,4));
     gui.add(dummyY.setup("dummyY",1.0,-1,2));
     gui.add(dummyX.setup("dummyX",0.16,-1,1));
 //    gui.add(radius.setup("radius",400,0,2000));
     gui.add(cubeMapSelector.setup("cubeMapSelector",1,1,4));  // Change cube map images use with meshType = 3
-  //  gui.add(displacementAmount.setup("displacementAmount",0.0,0,0.2));// TODO : Test with shader
     gui.add(cameraDistance.setup("cameraDistance",450,100,2000));
     gui.add(cameraZoom.setup("cameraZoom",0,25,25)); //Zoom in-out cam.
     gui.add(drawLights.setup("drawLights",0,25,25));
@@ -149,48 +115,10 @@ void ofApp::setupGui(){
     gui.add(cameraSpin.setup("cameraSpin",0,25,25)); // TODO : check if it's finally interesting to implement it, was just an idea.
 //  gui.add(activateParticles.setup("activateParticles",0,25,25)); // test with particles to future simulate delays , Atention! Drops FPS if not set higher values of meshResolution
     gui.add(showSolvers.setup("showSolvers",0,25,25));
-    
-    
     cubeMapSelector.addListener(this, &ofApp::updateCubeMap);
     meshMode.addListener(this,&ofApp::changeMeshMode);
     meshType.addListener(this,&ofApp::changeMeshType);
-    isDepthSmoothingActive.addListener(this,&ofApp::setDepthSmoothingActive);
-    nearThreshold.addListener(this,&ofApp::setNearThreshold);
-    farThreshold.addListener(this,&ofApp::setFarThreshold);
-    meshBlurRadius.addListener(this,&ofApp::setMeshBlurRadius);
-    //zAveragingMaxDepth.addListener(this,&ofApp::setDepthSmoothingActive);
-    //  blankDepthPixMax.addListener(this, &ofApp::setBlankDepthPixMax);
-    
-
 }
-
-
-
-
-void ofApp::setDepthSmoothingActive(bool &val){
-    kinectUtils.setDepthSmoothingActive(val);
-}
-
-void ofApp::setNearThreshold(float &val){
-    kinectUtils.setNearThreshold(val);
-}
-
-void ofApp::setFarThreshold(float &val){
-    kinectUtils.setFarThreshold(val);
-}
-
-void ofApp::setMeshBlurRadius(float &val){
-    kinectUtils.setMeshBlurRadius(val);
-}
-
-void ofApp::setZAveragingMaxDepth(float &val){
-    kinectUtils.setZAveragingMaxDepth(val);
-}
-
-void ofApp::setBlankDepthPixMax(float &val){
-    kinectUtils.setBlankDepthPixMax(val);
-}
-
 
 //--------------------------------------------------------------
 void ofApp::update() {
@@ -199,10 +127,8 @@ void ofApp::update() {
     if(cameraZoom){zoomInOutCamera();};
     if(cameraSpin){spinCamera();};
     if(!cameraSpin){updateCamera();};
-    
-    //updateKinectMesh();
-    updateKinectV1Mesh();
-    
+    positionLights();
+    kinectManager.processKinectV1Data();
     // Particle update -> TODO move to method
     for(unsigned int i = 0; i < p.size(); i++){
         p[i].update();
@@ -216,114 +142,25 @@ void ofApp::update() {
     fluidSolver.update();
 }
 
-void ofApp::calcNormals(ofMesh &mesh) {
-    for (int i = 0; i < mesh.getVertices().size(); i++)
-        mesh.addNormal(ofPoint(0, 0, 0));
-    
-    for (int i = 0; i < mesh.getIndices().size(); i += 3) {
-        const int ia = mesh.getIndices()[i];
-        const int ib = mesh.getIndices()[i + 1];
-        const int ic = mesh.getIndices()[i + 2];
-        //  cout<<"Index:"<<i<<"\n";
-        // cout<<ia <<ib<<ic<<"\n";
-        if (ia >= mesh.getVertices().size() || ib >= mesh.getVertices().size() ||
-            ic >= mesh.getVertices().size()) {
-            return;
-        }
-        //     cout<<mesh.getVertices()[ia] - mesh.getVertices()[ib]
-        //     <<mesh.getVertices()[ic] - mesh.getVertices()[ib]<<"\n";
-        ofVec3f e1 = mesh.getVertices()[ia] - mesh.getVertices()[ib];
-        ofVec3f e2 = mesh.getVertices()[ic] - mesh.getVertices()[ib];
-        ofVec3f no = e1.cross(e2);
-        
-        mesh.getNormals()[ia] += no;
-        mesh.getNormals()[ib] += no;
-        mesh.getNormals()[ic] += no;
-        
-        // depending on your clockwise / winding order, you might want to reverse
-        // the e2 / e1 above if your normals are flipped.
-    }
-}
-
-static void setNormals( ofMesh &mesh ){
-    
-    //The number of the vertices
-    int nV = mesh.getNumVertices();
-    
-    //The number of the triangles
-    int nT = mesh.getNumIndices() / 3;
-    
-    vector<ofPoint> norm( nV ); //Array for the normals
-    
-    //Scan all the triangles. For each triangle add its
-    //normal to norm's vectors of triangle's vertices
-    for (int t=0; t<nT; t++) {
-        
-        //Get indices of the triangle t
-        int i1 = mesh.getIndex( 3 * t );
-        int i2 = mesh.getIndex( 3 * t + 1 );
-        int i3 = mesh.getIndex( 3 * t + 2 );
-        
-        //Get vertices of the triangle
-        const ofPoint &v1 = mesh.getVertex( i1 );
-        const ofPoint &v2 = mesh.getVertex( i2 );
-        const ofPoint &v3 = mesh.getVertex( i3 );
-        
-        //Compute the triangle's normal
-        ofPoint dir = ( (v2 - v1).getCrossed( v3 - v1 ) ).getNormalized();
-        
-        //Accumulate it to norm array for i1, i2, i3
-        norm[ i1 ] += dir;
-        norm[ i2 ] += dir;
-        norm[ i3 ] += dir;
-    }
-    
-    //Normalize the normal's length
-    for (int i=0; i<nV; i++) {
-        norm[i].normalize();
-    }
-    
-    //Set the normals to mesh
-    mesh.clearNormals();
-    mesh.addNormals( norm );
-}
 
 void ofApp::updateCubeMap(int &cubeMapSelector){
     changeCubeMapImages(cubeMapSelector, myCubeMap);
 }
 
 void ofApp::changeMeshMode(int &meshSelector){
-    switch (meshSelector) {
-        case 1:{
-            mesh.setMode(OF_PRIMITIVE_POINTS);
-   
-        }
-            break;
-        case 2:{
-            mesh.setMode(OF_PRIMITIVE_LINES);
-
-        }
-            break;
-        case 3:{
-            mesh.setMode(OF_PRIMITIVE_TRIANGLES);
-        }
-            break;
-        case 4:{
-            mesh.setMode(OF_PRIMITIVE_LINE_LOOP);
-  
-        }
-    
-            break;
-            
-        default:
-            break;
-    }
+    kinectManager.setMeshType(meshSelector);
 }
 
 void ofApp::changeMeshType(int &meshTypeSelector){
-    if (meshType == 1){meshMode = 1;};
-    if (meshType == 2){meshMode = 3;};
-    if (meshType == 3){meshMode = 3;};
+    if (meshType == 1){
+       kinectManager.setMeshType(1);
+    };
+    if (meshType == 2){
+        kinectManager.setMeshType(3);
+    };
+    if (meshType == 3){
+        kinectManager.setMeshType(3);
+    };
 }
 
 void ofApp::changeCubeMapImages(int textureSelector, ofxCubeMap &myCubeMap) {
@@ -340,16 +177,6 @@ void ofApp::changeCubeMapImages(int textureSelector, ofxCubeMap &myCubeMap) {
                                  "warehouse/pz.jpg",
                                  "warehouse/nz.jpg");
             break;
-//        case 2:
-//            myCubeMap.loadImages(
-//                                 "greenery/px.png",
-//                                 "greenery/nx.png",
-//                                 "greenery/py.png",
-//                                 "greenery/ny.png",
-//                                 "greenery/pz.png",
-//                                 "greenery/nz.png");
-//            break;
-            
         case 2:
             myCubeMap.loadImages(
                                  "icy/0004.png",
@@ -385,7 +212,7 @@ void ofApp::changeCubeMapImages(int textureSelector, ofxCubeMap &myCubeMap) {
 }
 
 void ofApp::updateLights(){
-    ofVec3f meshPosition = mesh.getCentroid();
+    ofVec3f meshPosition = kinectManager.getMesh().getCentroid();
     pointLight.setPosition(100, 0, meshPosition.z+600);
     //spotLight.setPosition(0, 100, meshPosition.z+600);
     // spotLight90.setPosition(0, 100, meshPosition.z+600);
@@ -579,516 +406,9 @@ void ofApp::updateCamera(){
     cam.lookAt(ofVec3f(0,0,0));
     cam.setDistance(cameraDistance);
 }
-
-void ofApp:: smoothArray(ofShortPixels &pix ){
-//    printf("IN SMOOTH!\n");
-    int w = 640;
-    int h = 480;
-    ofShortPixels tempPixels;
-    tempPixels.allocate(w, h, 1);
-    
-    for(int y = 1; y<h-1; y++ ){
-        for(int x = 1; x<w-1; x++){
-            int index = x + y*w;
-            tempPixels[index] = 0;
-            if( pix[index] != 0 ){
-                int base = pix[index];
-                int total = 0;
-                int numAdded = 0;
-                for( int ty = y-1; ty <= y+1; ty++){
-                    for( int tx = x-1; tx <= x+1; tx++){
-                        int index2 = tx + ty*w;
-                        if( abs(pix[index2] - base) < 50 ){
-                            total += pix[index2];
-                            numAdded++;
-                        }
-                    }
-                    
-                }
-                if( numAdded > 0){
-                    tempPixels[index] = (float)total/(float)numAdded;
-                }
-            }
-        }
-    }
-    for(int y = 1; y<h-1; y++ ){
-        for(int x = 1; x<w-1; x++){
-            int index = x + y*w;
-//            pix[index] = 0;
-            pix[index] = tempPixels[index];
-        }
-    }
-}
-
-static void medianFilter(ofShortPixels & pix,int x, int y){
-    int width = pix.getWidth();
-    int matrixH = 5;
-    int matrixV = 5;
-    //create a sliding window of size 9
-    std::vector<unsigned short> window;
-    if (y>=(matrixH-1)/2){
-            int horizontalDisplacement = (matrixH-1)/2;
-            int verticalDisplacement = (matrixV-1)/2;
-            for (int h=-horizontalDisplacement ; h<=horizontalDisplacement;h++){
-                for (int v=-verticalDisplacement; v<=verticalDisplacement; v++ ){
-                    window.push_back(pix[(y+v)*width + x+h]);
-                }
-            }
-            sort(window.begin(),window.end());
-            for (vector<int>::size_type i = 0; i != window.size(); ++i)
-            // assign the median to centered element of the matrix
-            pix[y*width+x] = window[(matrixV*matrixH-1)/2];
-            window.clear();
-    }
-}
-
-void ofApp::updateKinectV1Mesh() {
-    kinect.update();
-    positionLights();
-    
-    if (kinect.isFrameNew()) {
-        
-        kinectUtils.processKinectData();
-        int w = 640;
-        int h = 480;
-        ofShortPixels  pix = kinect.getRawDepthPixels();
-        if(activateSmooth){
-            for(int i = 0; i < smoothCount; i++ ){
-                smoothArray( pix );
-            }
-            if(temporalSmoothing != 0.0){
-                for(int i = 0; i < h*w; i++){
-                    int diff =pix[i] - kinectDepth[i];
-                    int pixd = pix[i];
-        
-                    if(abs(diff) > 90){
-                        kinectDepth[i] = pixd;
-                       
-//                        pixd = kinectDepth[i];
-//                        if( diff > 0 ){
-//                            pixd += 90;
-//                        }else{
-//                            pixd -= 90;
-//                        }
-                        
-                    }
-                    kinectDepth[i] = kinectDepth[i] * temporalSmoothing + pixd * (1.0-temporalSmoothing);
-                    pix[i] = kinectDepth[i];
-                }
-            }
-        }
-        
-        //ofMesh mesh;
-        //  mesh.setMode(OF_PRIMITIVE_TRIANGLES);
-        mesh.clear();
-        points.clear();
-        indexs.clear();
-        int step = meshResolution;
-        
-        
-        for(int y = 0; y < h; y += step) {
-            vector<ofVec3f> temppoints;
-            vector<ofColor> tempcolors;
-            points.push_back(temppoints);
-            colors.push_back(tempcolors);
-            for(int x = 0; x < w; x += step) {
-                float distance = kinect.getDistanceAt(x, y);
-                mesh.addColor(ofColor::white);
-                ofVec3f tempPoint;
-                tempPoint = kinectUtils.getProcessedVertex(x, y);
-                points[y / step].push_back(tempPoint);
-            }
-        }
-        
-        // Create Vertex Indexes
-        int ind = 0;
-        for (int m = 0; m < h; m += step) {
-            vector<int> tempindexs;
-            indexs.push_back(tempindexs);
-            
-            for (int n = 0; n < w; n += step) {
-                if (points[m / step][n / step].z != 0) {
-                    ofVec3f ptTemp= points[m / step][n / step];
-                    mesh.addVertex(ptTemp);
-                    indexs[m / step].push_back(ind);
-                    ind++;
-                } else {
-                    indexs[m / step].push_back(-1);
-                }
-            }
-        }
-        
-        // Delanuay triangulation
-        int W = int(w / step);
-        for (int b = 0; b < h - step; b += step) {
-            for (int a = 0; a < w - 1; a += step) {
-                if ((indexs[int(b / step)][int(a / step)] != -1 &&
-                     indexs[int(b / step)][int(a / step + 1)] != -1) &&
-                    (indexs[int(b / step + 1)][int(a / step + 1)] != -1 &&
-                     indexs[int(b / step + 1)][int(a / step)] != -1)) {
-                        
-                        mesh.addTriangle(indexs[int(b / step)][int(a / step)],
-                                         indexs[int(b / step)][int(a / step + 1)],
-                                         indexs[int(b / step + 1)][int(a / step + 1)]);
-                        mesh.addTriangle(indexs[int(b / step)][int(a / step)],
-                                         indexs[int(b / step + 1)][int(a / step + 1)],
-                                         indexs[int(b / step + 1)][int(a / step)]);
-                    }
-            }
-        }
-        
-        // Calculate normals
-        calcNormals(mesh);
-        // Faster normal calculations
-        //setNormals(mesh);
-        //Fatten algorithm
-        for (int i = 0; i < mesh.getIndices().size(); i++) {
-            const int ia = mesh.getIndices()[i];
-            if (ia < mesh.getVertices().size() ) {
-                
-                //ofVec3f e1 = mesh.getVertices()[ia];
-                ofVec3f norml = mesh.getNormals()[ia];
-                float hello = sqrt(4);
-                
-                float l = sqrt(norml[0]*norml[0]+norml[1]*norml[1]+norml[2]*norml[2]);
-                
-                if (l != 0.0){
-                    mesh.getVertices()[ia] = mesh.getVertices()[ia] + (norml*3*fatten)/l;
-                }
-                
-            }
-        }
-        
-    }
-}
-
-void ofApp::updateKinectMesh(){
-    kinect0.update();
-    positionLights();
-
-    if (!useMultikinect){
-    
-        int w = 640;
-        int h = 480;
-        int total = 0;
-        int step = 2;
-        for(int y = 0; y < h; y += step) {
-            for(int x = 0; x < w; x += step) {
-                if(kinect.getDistanceAt(x, y) > 0) {
-                    mesh.addColor(kinect.getColorAt(x,y));
-                    mesh.addVertex(kinect.getWorldCoordinateAt(x, y));
-                    
-                }else{
-                    
-                }
-            }
-        }
-        
-        if (delayMode) {
-            if (kinectFrameLimiter > 20) {
-                kinectFrameLimiter = 0;
-                mesh.clear();
-            }
-        }
-        if (kinectFrameLimiter >= 0) {
-            if(!delayMode)
-                mesh.clear();
-            
-            points.clear();
-            colors.clear();
-            indexs.clear();
-            
-            {
-                vector<demoParticle> tempParticles;
-                for (int j = 0; j < h; j += step) {
-                    vector<ofVec3f> temppoints;
-                    vector<ofColor> tempcolors;
-                    
-                    points.push_back(temppoints);
-                    colors.push_back(tempcolors);
-                    
-                    for (int i = 0; i < w; i += step) {
-                        float distance =kinect.getDistanceAt(i, j);
-                        float previous_distance;
-                        float next_distance;
-                        float up_distance;
-                        float down_distance;
-                        float z_difference;
-                        if(i>0){
-                            previous_distance = kinect.getDistanceAt(i-1, j);
-                            next_distance = kinect.getDistanceAt(i+1, j);
-                            if(j>0){
-                                up_distance = kinect.getDistanceAt(i, j);
-                                down_distance = kinect.getDistanceAt(i-1, j);
-                                z_difference= (std::abs(distance-previous_distance) + std::abs(distance-next_distance) + std::abs(distance-up_distance)+std::abs(distance-down_distance))/4;
-                            }else{
-                                z_difference= (std::abs(distance-previous_distance) + std::abs(distance-next_distance))/2;
-                            }
-                        }
-                        if (distance > front && distance < back) {
-                            
-                           
-                                ofVec3f tempPoint;
-                                ofColor tempColor;
-                                demoParticle particle;
-                                
-                                tempPoint = ofVec3f(i, j, distance * -1 *displacement);
-                                ofColor c;
-                                float h = ofMap(distance, 50, 200, 0, 255, true);
-                                c.setHsb(h, 255, 255);
-                                points[j / step].push_back(tempPoint);
-                                colors[j / step].push_back(ofColor::white);
-                                particle.setPosition(tempPoint);
-                                particle.setMode(PARTICLE_MODE_NOISE);
-                                particle.reset();
-                                particle.addColor(c);
-                                tempParticles.push_back(particle);
-                                total++;
-                            
-                        } else {
-                            ofVec3f tempPoint2;
-                            ofColor tempColor2;
-                            tempPoint2 = ofVec3f(i, j, 0);
-                            tempColor2 = ofColor(ofColor::yellow);
-                            points[j / step].push_back(tempPoint2);
-                            colors[j / step].push_back(tempColor2);
-                        }
-                    }
-                }
-                
-                if(particleFrameLimiter>2 && activateParticles){
-                    particleFrameLimiter=0;
-                    p.reserve( p.size() + tempParticles.size() );                // preallocate memory without erase
-                    p.insert( p.end(), tempParticles.begin(), tempParticles.end() );
-                    tempParticles.clear();
-                    
-                }else if(!activateParticles){
-                    p.clear();
-                }
-                
-                int ind = 0;
-                for (int m = 0; m < h; m += step) {
-                    vector<int> tempindexs;
-                    indexs.push_back(tempindexs);
-                    
-                    for (int n = 0; n < w; n += step) {
-                        if (points[m / step][n / step].z != 0) {
-                            //   cout << points[m][n] << endl;
-                            mesh.addColor(colors[m / step][n / step]);
-                            ofVec3f ptTemp= points[m / step][n / step];
-                            //   ofVec3f pt = kinect0.getWorldCoordinateAt(ptTemp.x, ptTemp.y, ptTemp.z);
-                            mesh.addVertex(ptTemp);
-                            indexs[m / step].push_back(ind);
-                            ind++;
-                        } else {
-                            indexs[m / step].push_back(-1);
-                        }
-                    }
-                }
-                // Drops 4 fps
-                if (!pointCloudMode) {
-                    int W = int(w / step);
-                    for (int b = 0; b < h - step; b += step) {
-                        for (int a = 0; a < w - 1; a += step) {
-                            if ((indexs[int(b / step)][int(a / step)] != -1 &&
-                                 indexs[int(b / step)][int(a / step + 1)] != -1) &&
-                                (indexs[int(b / step + 1)][int(a / step + 1)] != -1 &&
-                                 indexs[int(b / step + 1)][int(a / step)] != -1)) {
-                                    
-                                    mesh.addTriangle(indexs[int(b / step)][int(a / step)],
-                                                     indexs[int(b / step)][int(a / step + 1)],
-                                                     indexs[int(b / step + 1)][int(a / step + 1)]);
-                                    mesh.addTriangle(indexs[int(b / step)][int(a / step)],
-                                                     indexs[int(b / step + 1)][int(a / step + 1)],
-                                                     indexs[int(b / step + 1)][int(a / step)]);
-                                }
-                        }
-                    }
-                }
-                calcNormals(mesh);
-                //                for (int i = 0; i < mesh.getIndices().size(); i++) {
-                //                    const int ia = mesh.getIndices()[i];
-                //                    if (ia < mesh.getVertices().size() ) {
-                //
-                //                        //ofVec3f e1 = mesh.getVertices()[ia];
-                //                        ofVec3f norml = mesh.getNormals()[ia];
-                //                        float hello = sqrt(4);
-                //
-                //                        float l = sqrt(norml[0]*norml[0]+norml[1]*norml[1]+norml[2]*norml[2]);
-                //
-                //                        if (l != 0.0){
-                //                            mesh.getVertices()[ia] = mesh.getVertices()[ia] + (norml*0.9*10.0)/l;
-                //                        }
-                //
-                //                    }
-                //                }
-            }
-        }
-        kinectFrameLimiter++;
-        particleFrameLimiter++;
-
-        
-    }else{
-        
-    int step = meshResolution;
-    int total = 0;
-    int h = kinect0.getDepthPixelsRef().getHeight();
-    int w = kinect0.getDepthPixelsRef().getWidth();
-    
-    if (kinect0.isFrameNew()) {
-        if (delayMode) {
-            if (kinectFrameLimiter > 20) {
-                kinectFrameLimiter = 0;
-                mesh.clear();
-            }
-        }
-        if (kinectFrameLimiter >= 0) {
-            if(!delayMode)
-                mesh.clear();
-            
-            points.clear();
-            colors.clear();
-            indexs.clear();
-            
-            {
-                vector<demoParticle> tempParticles;
-                for (int j = 0; j < h; j += step) {
-                    vector<ofVec3f> temppoints;
-                    vector<ofColor> tempcolors;
-                    
-                    points.push_back(temppoints);
-                    colors.push_back(tempcolors);
-                    
-                    for (int i = 0; i < w; i += step) {
-                        float distance = kinect0.getDistanceAt(i, j);
-                        float previous_distance;
-                        float next_distance;
-                        float up_distance;
-                        float down_distance;
-                        float z_difference;
-                        if(i>0){
-                            previous_distance = kinect0.getDistanceAt(i-1, j);
-                            next_distance = kinect0.getDistanceAt(i+1, j);
-                            if(j>0){
-                                up_distance = kinect0.getDistanceAt(i, j);
-                                down_distance = kinect0.getDistanceAt(i-1, j);
-                                z_difference= (std::abs(distance-previous_distance) + std::abs(distance-next_distance) + std::abs(distance-up_distance)+std::abs(distance-down_distance))/4;
-                            }else{
-                                z_difference= (std::abs(distance-previous_distance) + std::abs(distance-next_distance))/2;
-                            }
-                        }
-                        if (distance > front && distance < back) {
-                            
-
-                                ofVec3f tempPoint;
-                                ofColor tempColor;
-                                demoParticle particle;
-                                
-                                tempPoint = ofVec3f(i, j, distance * -1 *displacement);
-                                ofColor c;
-                                float h = ofMap(distance, 50, 200, 0, 255, true);
-                                c.setHsb(h, 255, 255);
-                                points[j / step].push_back(tempPoint);
-                                colors[j / step].push_back(ofColor::white);
-                                particle.setPosition(tempPoint);
-                                particle.setMode(PARTICLE_MODE_NOISE);
-                                particle.reset();
-                                particle.addColor(c);
-                                tempParticles.push_back(particle);
-                                total++;
-                            
-                        } else {
-                            ofVec3f tempPoint2;
-                            ofColor tempColor2;
-                            tempPoint2 = ofVec3f(i, j, 0);
-                            tempColor2 = ofColor(ofColor::yellow);
-                            points[j / step].push_back(tempPoint2);
-                            colors[j / step].push_back(tempColor2);
-                        }
-                    }
-                }
-                
-                if(particleFrameLimiter>2 && activateParticles){
-                    particleFrameLimiter=0;
-                    p.reserve( p.size() + tempParticles.size() );                // preallocate memory without erase
-                    p.insert( p.end(), tempParticles.begin(), tempParticles.end() );
-                    tempParticles.clear();
-                    
-                }else if(!activateParticles){
-                    p.clear();
-                }
-                
-                int ind = 0;
-                for (int m = 0; m < h; m += step) {
-                    vector<int> tempindexs;
-                    indexs.push_back(tempindexs);
-                    
-                    for (int n = 0; n < w; n += step) {
-                        if (points[m / step][n / step].z != 0) {
-                            //   cout << points[m][n] << endl;
-                            mesh.addColor(colors[m / step][n / step]);
-                            ofVec3f ptTemp= points[m / step][n / step];
-                            //   ofVec3f pt = kinect0.getWorldCoordinateAt(ptTemp.x, ptTemp.y, ptTemp.z);
-                            mesh.addVertex(ptTemp);
-                            indexs[m / step].push_back(ind);
-                            ind++;
-                        } else {
-                            indexs[m / step].push_back(-1);
-                        }
-                    }
-                }
-                // Drops 4 fps
-                if (!pointCloudMode) {
-                    int W = int(w / step);
-                    for (int b = 0; b < h - step; b += step) {
-                        for (int a = 0; a < w - 1; a += step) {
-                            int bstep = b/step;
-                            int astep = a/step;
-                            if ((indexs[int(bstep)][int(astep)] != -1 &&
-                                 indexs[int(bstep)][int(astep + 1)] != -1) &&
-                                (indexs[int(bstep + 1)][int(astep + 1)] != -1 &&
-                                 indexs[int(bstep + 1)][int(astep)] != -1)) {
-                                    
-                                    mesh.addTriangle(indexs[int(bstep)][int(astep)],
-                                                     indexs[int(bstep)][int(astep + 1)],
-                                                     indexs[int(bstep + 1)][int(astep + 1)]);
-                                    mesh.addTriangle(indexs[int(bstep)][int(astep)],
-                                                     indexs[int(bstep + 1)][int(astep + 1)],
-                                                     indexs[int(bstep + 1)][int(astep)]);
-                                }
-                        }
-                    }
-                }
-                calcNormals(mesh);
-                for (int i = 0; i < mesh.getIndices().size(); i++) {
-                    const int ia = mesh.getIndices()[i];
-                    if (ia < mesh.getVertices().size() ) {
-                        
-                        //ofVec3f e1 = mesh.getVertices()[ia];
-                        ofVec3f norml = mesh.getNormals()[ia];
-                        float hello = sqrt(4);
-                        
-                        float l = sqrt(norml[0]*norml[0]+norml[1]*norml[1]+norml[2]*norml[2]);
-                        
-                        if (l != 0.0){
-                            mesh.getVertices()[ia] += norml*fatten*3.0/l;
-                        }
-                    }
-                }
-            }
-        }
-        kinectFrameLimiter++;
-        particleFrameLimiter++;
-    }
-}
-}
-
 //--------------------------------------------------------------
 void ofApp::draw() {
-    //  ofBackgroundGradient(ofColor(64), ofColor(0));
-    //ofEnableBlendMode(OF_BLENDMODE_ADD);
     ofEnableDepthTest();
-    glPointSize(pointSize);
     glLineWidth(int(1));
     if(meshType == pointCloudMesh){drawPointCloudMode();};
     if(meshType == cubeMapMesh){drawCubeMapMode();};
@@ -1096,19 +416,14 @@ void ofApp::draw() {
     if(showSolvers){drawSolvers();};
     ofDisableDepthTest();
     drawGui();
-    
-   // kinectUtils.drawProcessing(0,0);
-   // grayImage.draw(0,0);
+    kinectManager.drawGui();
 }
 
 
 void ofApp::drawPointCloudMode(){
-    mesh.setUsage(GL_DYNAMIC_DRAW);
-    if (mesh.getVertices().size()) {
+      //mesh.setUsage(GL_DYNAMIC_DRAW);
         ofPushStyle();
-        glPointSize(pointSize);
         cam.begin();
-//        ofDrawAxis(200);
         ofPushMatrix();
         ofRotateX(20);
         //ofRotateZ(-180);
@@ -1116,15 +431,17 @@ void ofApp::drawPointCloudMode(){
       //  ofScale(1, -1, -1);
        // ofTranslate(0, 0, -1000);
         
-        ofTranslate(0, 0,translateMesh + displacement);
-        mesh.draw();
+      //  ofTranslate(0, 0,translateMesh + displacement);
+        //Refactored
+        //mesh.draw();
+        kinectManager.drawMesh(false);
         ofPopMatrix();
         
         if(activateParticles){
             ofPushMatrix();
             ofRotateZ(-180);
             
-            ofTranslate(-kinect0.getDepthPixelsRef().getWidth()/2, -kinect0.getDepthPixelsRef().getHeight()/2, +600);
+          //  ofTranslate(-kinect0.getDepthPixelsRef().getWidth()/2, -kinect0.getDepthPixelsRef().getHeight()/2, +600);
             for(unsigned int i = 0; i < p.size(); i++){
                 //  printf("%f /n",p[i].pos.z);
                 if(p[i].pos.y > 400){
@@ -1137,7 +454,6 @@ void ofApp::drawPointCloudMode(){
         }
         cam.end();
         ofPopStyle();
-    }
 }
 
 void ofApp::drawCubeMapMode(){
@@ -1152,12 +468,12 @@ void ofApp::drawCubeMapMode(){
     ofPushMatrix();
     ofRotateX(20);
     //ofRotateZ(-180);
-   // sphere.draw();
-    
     //ofTranslate(-kinect0.getDepthPixelsRef().getWidth()/2, -kinect0.getDepthPixelsRef().getHeight()/2, +600);
    // ofScale(1, -1, -1);
-    ofTranslate(0, 0,translateMesh + displacement);
-    mesh.drawFaces();
+  //  ofTranslate(0, 0,translateMesh + displacement);
+    //Refactored
+    //mesh.drawFaces();
+    kinectManager.drawMesh(true);
     ofPopMatrix();
     cubeMapShader.end();
 //    myCubeMap.drawSkybox(2000);
@@ -1179,8 +495,9 @@ void ofApp::drawTexturedMode(){
     //ofTranslate(-kinect0.getDepthPixelsRef().getWidth()/2, -kinect0.getDepthPixelsRef().getHeight()/2, +600);
   //  ofScale(1, -1, -1);
  //   ofTranslate(0, 0, -1000);
-    ofTranslate(0, 0,translateMesh + displacement);
-    mesh.drawFaces();
+ //   ofTranslate(0, 0,translateMesh + displacement);
+    //mesh.drawFaces();
+    kinectManager.drawMesh(true);
     ofDrawAxis(100);
     ofPopMatrix();
     phong.end();
@@ -1228,10 +545,10 @@ void ofApp::keyPressed(int key) {
             cameraDistance = cameraDistance+30;
             break;
         case OF_KEY_RIGHT:
-            fatten = fatten+0.2;
+            kinectManager.addFatten(0.2);
             break;
         case OF_KEY_LEFT:
-            fatten = fatten-0.2;
+            kinectManager.addFatten(-0.2);
             break;
         case '`':
             if (cameraSpin == 0){cameraSpin = 25;}
@@ -1302,14 +619,14 @@ void ofApp::keyPressed(int key) {
             break;
         case 'a':
             angle = angle +5;
-            kinect.setCameraTiltAngle(angle);
+            kinectManager.kinectV1.setCameraTiltAngle(angle);
             if (angle>25){
                 angle=25;};
 
             break;
         case 'z':
             angle = angle -5;
-            kinect.setCameraTiltAngle(angle);
+            kinectManager.kinectV1.setCameraTiltAngle(angle);
             if (angle<-25){
                 angle=-25;};
             
@@ -1391,9 +708,11 @@ void ofApp::keyPressed(int key) {
             break;
         case 'j':
             gui.setPosition(-1000,-1000);
+            kinectManager.setGuiPosition(-1000,-1000);
             break;
         case 'h':
             gui.setPosition(0, 40);
+            kinectManager.setGuiPosition(0,450);
             break;
     }
     
@@ -1481,40 +800,6 @@ void ofApp::drawSolvers(){
     ofSetBackgroundAuto(true);
 }
 
-#pragma mark - Kinect 
-
-void ofApp:: setupKinect(){
-    // enable depth->video image calibration
-    kinect.setRegistration(true);
-    
-    kinect.init();
-    //kinect.init(true); // shows infrared instead of RGB video image
-    //kinect.init(false, false); // disable video image (faster fps)
-    
-    kinect.open();		// opens first available kinect
-    //kinect.open(1);	// open a kinect by id, starting with 0 (sorted by serial # lexicographically))
-    //kinect.open("A00362A08602047A");	// open a kinect using it's unique serial #
-    
-    // print the intrinsic IR sensor values
-    if(kinect.isConnected()) {
-        ofLogNotice() << "sensor-emitter dist: " << kinect.getSensorEmitterDistance() << "cm";
-        ofLogNotice() << "sensor-camera dist:  " << kinect.getSensorCameraDistance() << "cm";
-        ofLogNotice() << "zero plane pixel size: " << kinect.getZeroPlanePixelSize() << "mm";
-        ofLogNotice() << "zero plane dist: " << kinect.getZeroPlaneDistance() << "mm";
-    }
-    
-    kinectUtils.setup(&kinect);
-    kinectUtils.setFarThreshold(farThreshold);
-    kinectUtils.setNearThreshold(nearThreshold);
-    
-    bThreshWithOpenCV = true;
-    // zero the tilt on startup
-    angle = 0;
-   
-    // start from the front
-    bDrawPointCloud = false;
-
-}
 
 #pragma mark - camera tweens
 

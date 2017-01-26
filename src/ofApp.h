@@ -18,6 +18,7 @@
 #include <queue>
 #include <deque>
 #include <string>
+#include "FFKinectMeshManager.h"
 
 
 enum meshType
@@ -31,18 +32,11 @@ class ofApp : public ofBaseApp,ofThread{
     
 public:
     
-    
+    FFKinectMeshManager kinectManager;
     ofxCvColorImage colorImg;
     ofxCvShortImage depth;
-    
-    
-    ofxCvGrayscaleImage grayImage; // grayscale depth image
-    ofxCvGrayscaleImage grayThreshNear; // the near thresholded image
-    ofxCvGrayscaleImage grayThreshFar;
-    parallelise paralleliseManager;
     ofShortPixels kinectDepth;
     ofShortPixels  kinectSmoothDepth;
-    deque <ofShortPixels> depthQueue;
     ofShortPixels currentDequeElement;
     std::vector<int> sumDepthArray;
     std::vector<unsigned short> averageDepthArray;
@@ -90,15 +84,7 @@ public:
     int flashCount;
     
     ofImage tex;
-    ofxMultiKinectV2 kinect0;
-    ofxKinect kinect;
-    ofxKinectDepthUtils  kinectUtils;
-    ofVboMesh mesh;
     enum meshType meshtype;
-    
-    vector< vector<ofVec3f> > points;
-    vector< vector<ofColor> > colors;
-    vector< vector<int> > indexs;
     
     ofxCubeMap myCubeMap;
     ofShader cubeMapShader;
@@ -114,23 +100,14 @@ public:
     ofxFloatSlider  dummyX;
 //    ofxIntSlider  radiusLights;
     ofxFloatSlider  translateMesh;
-    ofxIntSlider  innerThreshold;
     ofxIntSlider  frameRate;
-    ofxIntSlider  outerThreshold;
-    ofxIntSlider  back;
-    ofxIntSlider  pointSize;
-    ofxIntSlider  meshMode;
-    ofxIntSlider  smoothCount;
-    ofxIntSlider  meshResolution;
     ofxIntSlider  displacement;
     ofxIntSlider  meshType;
+    ofxIntSlider  meshMode;
     ofxIntSlider  cutoff;
     ofxIntSlider flashSpeed;
     ofxFloatSlider lightStrobeFrequency;
-    ofxIntSlider  displacementAmount;
     ofxFloatSlider cameraDistance;
-    ofxFloatSlider ZFilterMesh;
-    ofxFloatSlider fatten;
     ofxToggle showSolvers;
     ofxToggle activateSmooth;
     ofxToggle cameraZoom;
@@ -141,20 +118,8 @@ public:
     ofxToggle activatePointCloud;
     ofxToggle activateLightStrobe;
     ofxIntSlider  cubeMapSelector;
-    ofxFloatSlider temporalSmoothing;
     
-    
-    ofxToggle isDepthSmoothingActive;
-    ofxToggle isSmoothingThresholdOnly;
-    ofxToggle isNormalMapThresholdOnly;
-    ofxFloatSlider nearThreshold;
-    ofxFloatSlider farThreshold;
-    ofxFloatSlider meshBlurRadius;
-    ofxFloatSlider zAveragingMaxDepth;
-    ofxFloatSlider blankDepthPixMax;
-    
-    
-    
+
     //Solver
     float                   colorMult;
     float                   velocityMult;

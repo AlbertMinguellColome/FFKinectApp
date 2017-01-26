@@ -21,19 +21,28 @@ public:
     ofxKinectDepthUtils  kinectUtils;
     ofxPanel gui;
     ofVboMesh mesh;
+    ofVboMesh meshPointcloud;
     void init();
     void setupKinectV1();
     void setupKinectV2();
     void setupGui();
+    void drawGui();
+    void setGuiPosition(int x, int y);
     void processKinectV1Data();
     void processKinectV2Data();
     void drawMesh(bool faced);
+    void setMeshType(int type);
+    void addFatten(float amount );
+    ofVboMesh getMesh();
+    
     
 private:
     vector< vector<ofVec3f> > points;
     vector< vector<ofColor> > colors;
     vector< vector<int> > indexs;
     vector <demoParticle> p;
+    ofxFloatSlider  translateMesh;
+    ofxIntSlider  displacement;
     ofShortPixels kinectDepth;
     ofxFloatSlider nearThreshold;
     ofxFloatSlider farThreshold;
@@ -42,22 +51,18 @@ private:
     ofxFloatSlider blankDepthPixMax;
     ofxToggle isDepthSmoothingActive;
     ofxToggle isRGBMapActive;
-    ofxIntSlider  displacement;
     ofxToggle activateSmooth;
     ofxIntSlider  smoothCount;
     ofxFloatSlider temporalSmoothing;
     ofxIntSlider  meshResolution;
     ofxFloatSlider fatten;
     ofxToggle activateParticles;
-    ofxIntSlider  meshMode;
-    ofxIntSlider  meshType;
     int  particleFrameLimiter;
     int  kinectFrameLimiter;
     void changeMeshType(int &meshTypeSelector);
     void changeMeshMode(int &meshSelector);
     void smoothArray(ofShortPixels &pix);
     void calcNormals(ofMesh &mesh);
-    void drawGui(int x, int y);
     void setDepthSmoothingActive(bool &val);
     void setNearThreshold(float &val);
     void setFarThreshold(float &val);
