@@ -94,7 +94,7 @@ void ofxKinectDepthUtils::processKinectData()
     //    holeFillerShader.setUniform1f("farThreshold", modifiedFarThreshold);
     //    holeFillerFBO.begin();
     //    ofClear(0.0, 0.0, 0.0);
-    //    depthImageXYZ.draw(0, 0);
+       depthImageXYZ.draw(0, 0);
     //    holeFillerFBO.end();
     //    holeFillerShader.end();
     

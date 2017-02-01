@@ -83,14 +83,23 @@ void ofApp::setup() {
     //    ofAddListener(AbletonManager::getInstance().eventsVolumeChanged, this, &ofApp::volumeChanged);
     
     glShadeModel(GL_SMOOTH);
-    useMultikinect = false;
+    useKinectV2 = true;
     kinectManager.init();
     
-    if(useMultikinect){
+    if(useKinectV2){
         kinectManager.setupKinectV2();
     }else{
         kinectManager.setupKinectV1();
     }
+    
+    
+    colorImg.allocate(640,480);
+    grayImage.allocate(640,480);
+    grayBg.allocate(640,480);
+    grayDiff.allocate(640,480);
+    
+    bLearnBakground = true;
+    threshold = 80;
 }
 
 void ofApp::setupGui(){
@@ -128,7 +137,12 @@ void ofApp::update() {
     if(cameraSpin){spinCamera();};
     if(!cameraSpin){updateCamera();};
     positionLights();
-    kinectManager.processKinectV1Data();
+    if(useKinectV2){
+        kinectManager.processKinectV2Data();
+    }else{
+        kinectManager.processKinectV1Data();
+    }
+    
     // Particle update -> TODO move to method
     for(unsigned int i = 0; i < p.size(); i++){
         p[i].update();
@@ -139,6 +153,30 @@ void ofApp::update() {
         fluidDrawer.setup(&fluidSolver);
         resizeFluid = false;
     }
+    
+    if (kinectManager.kinectV1.isFrameNew()){
+        
+
+        colorImg.setFromPixels(kinectManager.kinectV1.getPixels(),640,480);
+
+        
+        grayImage = colorImg;
+        if (bLearnBakground == true){
+            grayBg = grayImage;		// the = sign copys the pixels from grayImage into grayBg (operator overloading)
+            bLearnBakground = false;
+        }
+        
+        // take the abs value of the difference between background and incoming and then threshold:
+        grayDiff.absDiff(grayBg, grayImage);
+        grayDiff.threshold(threshold);
+        
+        // find contours which are between the size of 20 pixels and 1/3 the w*h pixels.
+        // also, find holes is set to true so we will get interior contours as well....
+        contourFinder.findContours(grayDiff, 80, (640*480)/1, 10, true);	// find holes
+
+    }
+    
+    
     fluidSolver.update();
 }
 
@@ -417,6 +455,72 @@ void ofApp::draw() {
     ofDisableDepthTest();
     drawGui();
     kinectManager.drawGui();
+    
+    ofFill();
+   // ofSetHexColor(0x333333);
+   // ofRect(360,540,320,240);
+    ofSetHexColor(0xffffff);
+    
+    // we could draw the whole contour finder
+  //  contourFinder.draw(0,0);
+    
+    float farPointX = 0;
+    float farPointY = 0;
+    
+    for (int i = 0; i < contourFinder.nBlobs; i++){
+        contourFinder.blobs[0].draw(0,0);
+        
+        // draw over the centroid if the blob is a hole
+        
+        for (int j = 0 ; j< contourFinder.blobs[i].nPts ; j++){
+            
+            if (contourFinder.blobs[0].pts[j].x>10 && contourFinder.blobs[i].pts[j].x< 630){
+            if(contourFinder.blobs[0].pts[j].x > farPointX){
+                farPointX =contourFinder.blobs[i].pts[j].x;
+            }
+            }
+            if (contourFinder.blobs[0].pts[j].y>10 && contourFinder.blobs[i].pts[j].y< 470){
+            if(contourFinder.blobs[0].pts[j].y > farPointY){
+                farPointY =contourFinder.blobs[0].pts[j].y;
+            }
+            }
+            
+            
+        }
+    }
+        ofSetColor(255);
+        
+//            float left =contourFinder.blobs[i].boundingRect.getLeft();
+//            float right =contourFinder.blobs[i].boundingRect.getRight();
+//            float up = contourFinder.blobs[i].boundingRect.getTop();
+//            float down = contourFinder.blobs[i].boundingRect.getBottom();
+//            if (right>previousFarpointX && i>0){
+//                farPointX = right;
+//            }
+//            
+//            if (up>previousFarpointY && i>0){
+//                farPointY = up;
+//            }
+        
+//            if(previousFarpointX==0){
+//                previousFarpointX = farPointX;
+//            }
+//            if(previousFarpointY==0){
+//                previousFarpointY = farPointY;
+//            }
+            if (std::abs(this->previousFarpointY-farPointY) > 40 && abs(this->previousFarpointX - farPointX) > 40){
+           // printf("%f \n",previousFarpointX);
+                ofVec2f vel = ofVec2f(3,3) / ofGetWindowSize();
+                ofVec2f eventPos = ofVec2f(farPointX+100, farPointY+100);
+                ofVec2f mouseNorm = ofVec2f(eventPos) / ofGetWindowSize();
+                ofVec2f pastPoint =ofVec2f(previousFarpointX,previousFarpointY);
+                ofVec2f mouseVel = ofVec2f(eventPos - pastPoint) / ofGetWindowSize();
+                addToFluid(mouseNorm, mouseVel, true, true);
+                previousFarpointX = farPointX;
+                previousFarpointY = farPointY;
+        
+    }
+    ofDrawBitmapString( "Fair point : " + ofToString(farPointX) + "\n",farPointX,farPointY);
 }
 
 

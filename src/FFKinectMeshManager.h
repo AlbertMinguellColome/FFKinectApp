@@ -37,6 +37,7 @@ public:
     
     
 private:
+    bool isKinectV2Active;
     vector< vector<ofVec3f> > points;
     vector< vector<ofColor> > colors;
     vector< vector<int> > indexs;
@@ -49,6 +50,8 @@ private:
     ofxFloatSlider meshBlurRadius;
     ofxFloatSlider zAveragingMaxDepth;
     ofxFloatSlider blankDepthPixMax;
+    ofxToggle isSmoothTresholdOnly;
+    ofxToggle isNormalMapThresholdOnly;
     ofxToggle isDepthSmoothingActive;
     ofxToggle isRGBMapActive;
     ofxToggle activateSmooth;
@@ -69,4 +72,6 @@ private:
     void setMeshBlurRadius(float &val);
     void setZAveragingMaxDepth(float &val);
     void setBlankDepthPixMax(float &val);
+    void setSmoothingThresholdOnly(bool &val);
+    void setNormalMapThresholdOnly(bool &val);
 };

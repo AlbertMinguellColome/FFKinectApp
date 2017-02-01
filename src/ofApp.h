@@ -33,7 +33,6 @@ class ofApp : public ofBaseApp,ofThread{
 public:
     
     FFKinectMeshManager kinectManager;
-    ofxCvColorImage colorImg;
     ofxCvShortImage depth;
     ofShortPixels kinectDepth;
     ofShortPixels  kinectSmoothDepth;
@@ -80,7 +79,7 @@ public:
     float camCurrentX;
     float camCurrentY;
     float camCurrentAngle;
-    float useMultikinect;
+    bool useKinectV2;
     int flashCount;
     
     ofImage tex;
@@ -118,6 +117,21 @@ public:
     ofxToggle activatePointCloud;
     ofxToggle activateLightStrobe;
     ofxIntSlider  cubeMapSelector;
+    
+    
+    
+    ofxCvColorImage			colorImg;
+    
+    ofxCvGrayscaleImage 	grayImage;
+    ofxCvGrayscaleImage 	grayBg;
+    ofxCvGrayscaleImage 	grayDiff;
+    
+    ofxCvContourFinder 	contourFinder;
+    float previousFarpointX;
+    float previousFarpointY;
+    
+    int 				threshold;
+    bool				bLearnBakground;
     
 
     //Solver

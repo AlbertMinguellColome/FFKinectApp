@@ -22,8 +22,7 @@ void FFKinectMeshManager::init (){
 
 
 void FFKinectMeshManager::setupKinectV1(){
-    
-    
+    isKinectV2Active=false;
     kinectV1.init();
     // enable depth->video image calibration
     kinectV1.setRegistration(true);
@@ -42,9 +41,11 @@ void FFKinectMeshManager::setupKinectV1(){
     kinectUtils.setup(&kinectV1);
     kinectUtils.setFarThreshold(farThreshold);
     kinectUtils.setNearThreshold(nearThreshold);
+    
 }
 
 void FFKinectMeshManager::setupKinectV2(){
+    isKinectV2Active=true;
     kinectV2.open(true, true, 0, 2);
     // Note :
     // Default OpenCL device might not be optimal.
@@ -63,18 +64,17 @@ void FFKinectMeshManager::setupGui(){
     gui.add(displacement.setup("displacement",0,-300,300)); // adjust kinect points Z-postion
     gui.add(isRGBMapActive.setup("activateRGB",0,25,25));
     gui.add(isDepthSmoothingActive.setup("isDepthSmoothingActive",0,25,25));
+    gui.add(isSmoothTresholdOnly.setup("isSmoothTresholdOnly",0,25,25));
+    gui.add(isNormalMapThresholdOnly.setup("isNormalMapThresholdOnly",0,25,25));
     gui.add(meshBlurRadius.setup("meshBlurRadius",1,0,10));
-    //    gui.add(isSmoothingThresholdOnly.setup("isSmoothingThresholdOnly",0,25,25)); // TODO : Test with shader
-    //    gui.add(isNormalMapThresholdOnly.setup("isNormalMapThresholdOnly",0,25,25)); // TODO : Test with shader
     gui.add(nearThreshold.setup("nearThreshold",120,0,4000));
     gui.add(farThreshold.setup("farThreshold",1420,0,4000));
-    //  gui.add(zAveragingMaxDepth.setup("zAveragingMaxDepth",195,0,200));  // TODO : Test with shader
-    //  gui.add(blankDepthPixMax.setup("blankDepthPixMax",7,0,10)); // TODO : Test with shader
+    gui.add(zAveragingMaxDepth.setup("zAveragingMaxDepth",195,0,200));  // TODO : Test with shader
+    gui.add(blankDepthPixMax.setup("blankDepthPixMax",7,0,10)); // TODO : Test with shader
     gui.add(activateSmooth.setup("activateSmooth",0,25,25));
     gui.add(smoothCount.setup("smoothCount",2,1,10));
     gui.add(temporalSmoothing.setup("temporalSmoothing",0,0,1));
     gui.add(meshResolution.setup("meshResolutionSlider",2,1,16)); //Increase-decrease resolution, use always pair values
-    gui.add(displacement.setup("displacement",0,-300,300)); // adjust kinect points Z-postion
     gui.add(fatten.setup("fatten",0,-4,4));
 
     //    gui.add(radius.setup("radius",400,0,2000));
@@ -85,8 +85,10 @@ void FFKinectMeshManager::setupGui(){
     nearThreshold.addListener(this,&FFKinectMeshManager::setNearThreshold);
     farThreshold.addListener(this,&FFKinectMeshManager::setFarThreshold);
     meshBlurRadius.addListener(this,&FFKinectMeshManager::setMeshBlurRadius);
-    //zAveragingMaxDepth.addListener(this,&ofApp::setDepthSmoothingActive);
-    //  blankDepthPixMax.addListener(this, &ofApp::setBlankDepthPixMax);
+    zAveragingMaxDepth.addListener(this,&FFKinectMeshManager::setZAveragingMaxDepth);
+    blankDepthPixMax.addListener(this, &FFKinectMeshManager::setBlankDepthPixMax);
+    isSmoothTresholdOnly.addListener(this,&FFKinectMeshManager::setSmoothingThresholdOnly);
+    isNormalMapThresholdOnly.addListener(this, &FFKinectMeshManager::setNormalMapThresholdOnly);
 }
 void FFKinectMeshManager::drawGui(){
     gui.draw();
@@ -97,15 +99,30 @@ void FFKinectMeshManager::setGuiPosition(int x, int y){
 
 void FFKinectMeshManager::drawMesh(bool faced){
     if(faced){
-        ofTranslate(0, 0,translateMesh + displacement);
+        if(!isKinectV2Active){
+            ofTranslate(0, 0,translateMesh + displacement);
+        }else{
+            ofRotateZ(-180);
+            ofTranslate(-kinectV2.getDepthPixelsRef().getWidth()/2, -kinectV2.getDepthPixelsRef().getHeight()/2, +600);
+        }
         mesh.draw();
     }else{
         if(!isRGBMapActive){
-        ofTranslate(0, 0,translateMesh + displacement);
+            if(!isKinectV2Active){
+                ofTranslate(0, 0,translateMesh + displacement);
+            }else{
+                ofRotateZ(-180);
+                ofTranslate(-kinectV2.getDepthPixelsRef().getWidth()/2, -kinectV2.getDepthPixelsRef().getHeight()/2, +600);
+            }
         mesh.drawFaces();
         }else{
-        ofScale(1, -1, -1);
-        ofTranslate(0, 0, -1000);
+            if(!isKinectV2Active){
+                ofScale(1, -1, -1);
+                ofTranslate(0, 0, -1000);
+            }else{
+                ofRotateZ(-180);
+                ofTranslate(-kinectV2.getDepthPixelsRef().getWidth()/2, -kinectV2.getDepthPixelsRef().getHeight()/2, +600);
+            }
         meshPointcloud.drawVertices();
         }
     }
@@ -265,7 +282,7 @@ void FFKinectMeshManager::processKinectV2Data(){
                             ofVec3f tempPoint;
                             ofColor tempColor;
                             demoParticle particle;
-                            tempPoint = ofVec3f(i, j, distance * -1 *displacement);
+                            tempPoint = ofVec3f(i, j, distance * -1 * 3);
                             ofColor c;
                             float h = ofMap(distance, 50, 200, 0, 255, true);
                             c.setHsb(h, 255, 255);
@@ -491,3 +508,10 @@ void FFKinectMeshManager::setZAveragingMaxDepth(float &val){
 void FFKinectMeshManager::setBlankDepthPixMax(float &val){
     kinectUtils.setBlankDepthPixMax(val);
 }
+void FFKinectMeshManager::setSmoothingThresholdOnly(bool &val){
+    kinectUtils.setSmoothingThresholdOnly(val);
+}
+void FFKinectMeshManager::setNormalMapThresholdOnly(bool &val){
+    kinectUtils.setNormalMapThresholdOnly(val);
+}
+
