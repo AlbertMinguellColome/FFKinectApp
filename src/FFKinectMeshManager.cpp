@@ -96,13 +96,43 @@ void FFKinectMeshManager::setGuiPosition(int x, int y){
 }
 
 void FFKinectMeshManager::drawMesh(bool faced){
-    if(faced){
-        ofTranslate(0, 0,translateMesh + displacement);
-        mesh.draw();
+    if(!faced){
+      //  ofTranslate(0, 0,translateMesh + displacement);
+        //mesh.draw();
+       // ofFill();
+        ofRotateZ(-180);
+        ofTranslate(0, -80,1100);
+    
+        wireframeMesh.draw();
+      /*
+        glPushAttrib(GL_ALL_ATTRIB_BITS);
+        glShadeModel(GL_FLAT);
+        glProvokingVertex(GL_FIRST_VERTEX_CONVENTION);
+        convertedMesh.draw();
+        glShadeModel(GL_SMOOTH);
+        glPopAttrib();*/
+      //  mesh.draw();
+
     }else{
         if(!isRGBMapActive){
-        ofTranslate(0, 0,translateMesh + displacement);
-        mesh.drawFaces();
+     //   ofTranslate(0, 0,translateMesh + displacement);
+        //mesh.drawFaces();
+          //  ofTranslate(0, -80,1100);
+          //  mesh.drawFaces();
+            ofRotateZ(-180);
+            ofTranslate(0, -80,1100);
+
+            wireframeMesh.drawFaces();
+          /*  ofFill();
+            
+            
+            glPushAttrib(GL_ALL_ATTRIB_BITS);
+            glShadeModel(GL_FLAT);
+            glProvokingVertex(GL_FIRST_VERTEX_CONVENTION);
+            convertedMesh.drawFaces();
+            glShadeModel(GL_SMOOTH);
+            glPopAttrib();*/
+
         }else{
         ofScale(1, -1, -1);
         ofTranslate(0, 0, -1000);
@@ -112,8 +142,190 @@ void FFKinectMeshManager::drawMesh(bool faced){
 }
 
 void FFKinectMeshManager::processKinectV1Data(){
+    
     kinectV1.update();
+    if(kinectV1.isFrameNew()) {
+        del.reset();
+        
+        
+        unsigned char* pix = new unsigned char[640*480];
+        
+        unsigned char* gpix = new unsigned char[640*480];
+        
+        for(int x=0;x<640;x+=1) {
+            for(int y=0;y<480;y+=1) {
+                float distance = kinectV1.getDistanceAt(x, y);
+                
+                int pIndex = x + y * 640;
+                pix[pIndex] = 0;
+                
+                if(distance > 100 && distance < 1100) {
+                    pix[pIndex] = 255;
+                }
+                
+            }
+        }
+        
+        blob.setFromPixels(pix, 640, 480, OF_IMAGE_GRAYSCALE);
+        
+        int numPoints = 0;
+        
+        for(int x=0;x<640;x+=meshResolution*2) {
+            for(int y=0;y<480;y+=meshResolution*2) {
+                int pIndex = x + 640 * y;
+                
+                if(blob.getPixels()[pIndex]> 0) {
+                    ofVec3f wc = kinectV1.getWorldCoordinateAt(x, y);
+                    
+                    wc.x = x - 320.0;
+                    wc.y = y - 240.0;
+                    
+                    if(abs(wc.z) > 0 && abs(wc.z ) < 2000) {
+                        
+                        wc.z = -wc.z;
+                        wc.x = ofClamp(wc.x, -320,320);
+                        wc.y = ofClamp(wc.y, -240,240);
+                        
+                        del.addPoint(wc);
+                    }
+                    numPoints++;
+                }
+                
+            }
+        }
+        
+        
+        if(numPoints >0)
+            del.triangulate();
+        
+        for(int i=0;i<del.triangleMesh.getNumVertices();i++) {
+            del.triangleMesh.addColor(ofColor(0,0,0));
+        }
+        
+        for(int i=0;i<del.triangleMesh.getNumIndices()/3;i+=1) {
+            ofVec3f v = del.triangleMesh.getVertex(del.triangleMesh.getIndex(i*3));
+            
+            v.x = ofClamp(v.x, -319,319);
+            v.y = ofClamp(v.y, -239, 239);
+            
+            ofColor c = kinectV1.getColorAt(v.x+320.0, v.y+240.0);
+            
+            
+            c.a = 255;
+            
+            del.triangleMesh.setColor(del.triangleMesh.getIndex(i*3),c);
+            del.triangleMesh.setColor(del.triangleMesh.getIndex(i*3+1),c);
+            del.triangleMesh.setColor(del.triangleMesh.getIndex(i*3+2),c);
+        }
+        
+        
+        
+        
+        convertedMesh.clear();
+        wireframeMesh.clear();
+        for(int i=0;i<del.triangleMesh.getNumIndices()/3;i+=1) {
+            
+            int indx1 = del.triangleMesh.getIndex(i*3);
+            ofVec3f p1 = del.triangleMesh.getVertex(indx1);
+            int indx2 = del.triangleMesh.getIndex(i*3+1);
+            ofVec3f p2 = del.triangleMesh.getVertex(indx2);
+            int indx3 = del.triangleMesh.getIndex(i*3+2);
+            ofVec3f p3 = del.triangleMesh.getVertex(indx3);
+            
+            ofVec3f triangleCenter = (p1+p2+p3)/3.0;
+            triangleCenter.x += 320;
+            triangleCenter.y += 240;
+            
+            triangleCenter.x = floor(ofClamp(triangleCenter.x, 0,640));
+            triangleCenter.y = floor(ofClamp(triangleCenter.y, 0, 480));
+            
+            int pixIndex = triangleCenter.x + triangleCenter.y * 640;
+            if(pix[pixIndex] > 0) {
+                
+                convertedMesh.addVertex(p1);
+                convertedMesh.addColor(del.triangleMesh.getColor(indx1));
+                
+                convertedMesh.addVertex(p2);
+                convertedMesh.addColor(del.triangleMesh.getColor(indx2));
+                
+                convertedMesh.addVertex(p3);
+                convertedMesh.addColor(del.triangleMesh.getColor(indx3));
+                
+                //wireframeMesh.addIndex(indx1);
+                wireframeMesh.addVertex(p1);
+               // wireframeMesh.addIndex(indx2);
+                wireframeMesh.addVertex(p2);
+             //   wireframeMesh.addIndex(indx3);
+                wireframeMesh.addVertex(p3);
+       
+
+            }
+            
+        }
+        
+        
+        for(int i = 0 ; i < del.triangleMesh.getNumIndices(); i+=3){
+            ofIndexType a,b,c;
+            float centerX, centerY;
+            
+            a = del.triangleMesh.getIndex(i);
+            
+            b = del.triangleMesh.getIndex(i+1);
+            
+            c = del.triangleMesh.getIndex(i+2);
+            
+            if (a >= wireframeMesh.getVertices().size() || b >= wireframeMesh.getVertices().size() ||
+                c >= wireframeMesh.getVertices().size()) {
+                return;
+            }
+            //  wireframeMesh.addIndex(del.triangleMesh.getIndex(i));
+            //    wireframeMesh.addIndex(del.triangleMesh.getIndex(i+1));
+            //   wireframeMesh.addIndex(del.triangleMesh.getIndex(i+2));
+            
+            ofVec3f posA = wireframeMesh.getVerticesPointer()[i];
+            ofVec3f posB = wireframeMesh.getVerticesPointer()[(i+1)];
+            ofVec3f posC = wireframeMesh.getVerticesPointer()[(i+2)];
+            
+            ofVec3f norm = (posA - posC).getCrossed(posB - posC).getNormalized();
+            wireframeMesh.addNormal(norm);
+            wireframeMesh.addNormal(norm);
+            wireframeMesh.addNormal(norm);
+        }
+        
+        /*  for(int i=0;i<wireframeMesh.getNumIndices()/3;i+=1) {
+         
+         int indx1 = wireframeMesh.getIndex(i*3);
+         ofVec3f p1 = wireframeMesh.getVertex(indx1);
+         int indx2 = wireframeMesh.getIndex(i*3+1);
+         ofVec3f p2 = wireframeMesh.getVertex(indx2);
+         int indx3 = wireframeMesh.getIndex(i*3+2);
+         ofVec3f p3 = wireframeMesh.getVertex(indx3);
+         
+         for (int i = 0; i < wireframeMesh.getVertices().size(); i++)
+         wireframeMesh.addNormal(ofPoint(0, 0, 0));
+         
+         if (indx1 >= wireframeMesh.getVertices().size() || indx2 >= wireframeMesh.getVertices().size() ||
+         indx3 >= wireframeMesh.getVertices().size()) {
+         return;
+         }
+         ofVec3f e1 = p1 - p2;
+         ofVec3f e2 = p3 - p2;
+         ofVec3f no = e1.cross(e2);
+         
+         wireframeMesh.getNormals()[indx1] += no;
+         wireframeMesh.getNormals()[indx2] += no;
+         wireframeMesh.getNormals()[indx3] += no;
+         }*/
+
+      
+
+        delete[] pix;
+        delete[] gpix;
+        
+    }
+ /*   kinectV1.update();
     if (kinectV1.isFrameNew()) {
+        del.reset();
         kinectUtils.processKinectData();
         int w = 640;
         int h = 480;
@@ -158,9 +370,12 @@ void FFKinectMeshManager::processKinectV1Data(){
                 }
                 ofVec3f tempPoint;
                 tempPoint = kinectUtils.getProcessedVertex(x, y);
+                del.addPoint(tempPoint);
                 points[y / step].push_back(tempPoint);
             }
         }
+        
+        del.triangulate();
         // Create Vertex Indexes
         int ind = 0;
         for (int m = 0; m < h; m += step) {
@@ -196,6 +411,7 @@ void FFKinectMeshManager::processKinectV1Data(){
                     }
             }
         }
+        mesh = del.triangleMesh;
         calcNormals(mesh);
         //Fatten algorithm
         for (int i = 0; i < mesh.getIndices().size(); i++) {
@@ -210,7 +426,7 @@ void FFKinectMeshManager::processKinectV1Data(){
                 }
             }
         }
-    }
+    }*/
 }
 
 ofVboMesh FFKinectMeshManager::getMesh(){
@@ -445,19 +661,19 @@ static void medianFilter(ofShortPixels & pix,int x, int y){
 void FFKinectMeshManager::setMeshType(int meshSelector){
     switch (meshSelector) {
         case 1:{
-            mesh.setMode(OF_PRIMITIVE_POINTS);
+            wireframeMesh.setMode(OF_PRIMITIVE_POINTS);
         }
             break;
         case 2:{
-            mesh.setMode(OF_PRIMITIVE_LINES);
+            wireframeMesh.setMode(OF_PRIMITIVE_LINES);
         }
             break;
         case 3:{
-            mesh.setMode(OF_PRIMITIVE_TRIANGLES);
+            wireframeMesh.setMode(OF_PRIMITIVE_TRIANGLES);
         }
             break;
         case 4:{
-            mesh.setMode(OF_PRIMITIVE_LINE_LOOP);
+            wireframeMesh.setMode(OF_PRIMITIVE_LINE_LOOP);
         }
             break;
             

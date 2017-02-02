@@ -12,6 +12,7 @@
 #include "ofxKinectDepthUtils.h"
 #include "ofxGui.h"
 #include "demoParticle.h"
+#include "ofxDelaunay.h"
 
 class FFKinectMeshManager {
     
@@ -20,6 +21,10 @@ public:
     ofxMultiKinectV2 kinectV2;
     ofxKinectDepthUtils  kinectUtils;
     ofxPanel gui;
+    ofxDelaunay del;
+    ofMesh convertedMesh;
+    ofMesh wireframeMesh;
+    ofImage blob;
     ofVboMesh mesh;
     ofVboMesh meshPointcloud;
     void init();
